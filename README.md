@@ -1,39 +1,41 @@
-# VB Lineups
+# Apps
 
-A Progressive Web App for building valid mixed volleyball lineups from your roster.
+A collection of no-build PWAs for volleyball, served from GitHub Pages.
 
-## Features
+## Structure
 
-- Add players with gender and position assignments (Setter, Hitter / OH+OPP, Middle, Libero)
-- Configurable minimum women on court per rotation
-- Optional split between Outside Hitter and Opposite roles
-- Brute-force combinatorial search — finds every valid lineup
-- Rotation-sensitive detection: flags lineups where a middle swap lands exactly at the minimum
-- Filter by setter, libero, must-include hitters, middles
-- Sort by women count or rotation sensitivity
-- Roster persisted to `localStorage` — your team is there next time you open the app
-- Works offline after first visit
-- Installable on iOS and Android home screens
+```
+index.html        ← landing page
+vb-lineups/       ← VB Lineups app
+  index.html
+  app.js
+  style.css
+  manifest.json
+  sw.js
+  icons/
+```
 
 ## Run locally
 
 ```sh
 python3 -m http.server 8080
-# then open http://localhost:8080
+# landing:    http://localhost:8080
+# vb-lineups: http://localhost:8080/vb-lineups/
 ```
 
-## Deploy to GitHub Pages
+## Deploy
 
-1. Push to a GitHub repo (`main` branch, root)
-2. Go to **Settings → Pages → Source** and set it to `main` branch, `/ (root)`
-3. Your app will be live at `https://yourusername.github.io/vb-lineups/`
+Push to `main`. GitHub Pages serves immediately — no build step.
 
-## Install on iPhone
+## VB Lineups
 
-1. Open the URL in Safari
-2. Tap the Share button → **Add to Home Screen**
+Build valid lineups for mixed volleyball. Features:
 
-## Install on Android
-
-1. Open the URL in Chrome
-2. Tap the banner or **⋮ → Add to Home screen**
+- Add players with gender and position assignments (Setter, Hitter / OH + OPP, Middle, Libero)
+- Configurable minimum women on court per rotation
+- Optional split between Outside Hitter and Opposite roles
+- Finds every valid lineup combination
+- Flags rotation-sensitive lineups
+- Filter by setter, libero, hitters, middles
+- Roster persisted to `localStorage`
+- Works offline, installable on iOS and Android
