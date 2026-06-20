@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="KQOTC" />
+  <title>KQOTC</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN 1 — CHECK-IN
+══════════════════════════════════════════════════ -->
+<div class="screen active" id="screen-checkin">
+
+  <header class="app-header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 20h18"/>
+        <path d="M5 20 3 11l5 3.5L12 6l4 8.5L21 11l-2 9"/>
+      </svg>
+    </div>
+    <div>
+      <h1>KQOTC</h1>
+      <div class="subtitle">King / Queen of the Court</div>
+    </div>
+  </header>
+
+  <div class="checkin-content">
+
+    <div class="section">
+      <div class="step-label">Check-in</div>
+      <div class="add-row">
+        <input type="text" id="player-input" placeholder="Player name" maxlength="24"
+          autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" />
+        <button class="add-btn" onclick="addPlayer()">+</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="roster-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="step-label" style="margin-bottom:0">Players</span>
+          <span class="roster-count" id="player-count"></span>
+        </div>
+        <span class="court-hint" id="court-hint"></span>
+      </div>
+      <div id="player-list" class="player-list"></div>
+      <div id="player-empty" class="empty-state">No players yet — add some above</div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button class="cta-btn" id="start-btn" onclick="startEvent()" disabled>
+      Start event
+    </button>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN 2 — ACTIVE ROUND
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-round">
+
+  <header class="app-header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 20h18"/>
+        <path d="M5 20 3 11l5 3.5L12 6l4 8.5L21 11l-2 9"/>
+      </svg>
+    </div>
+    <div>
+      <h1 id="round-title">Round 1</h1>
+      <div class="subtitle" id="round-subtitle"></div>
+    </div>
+    <button class="end-event-btn" onclick="endEvent()">End event</button>
+  </header>
+
+  <div class="round-content" id="round-content"></div>
+
+  <div class="footer">
+    <button class="cta-btn" onclick="endRound()">End round →</button>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN 3 — TRANSITION
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-transition">
+
+  <header class="app-header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 20h18"/>
+        <path d="M5 20 3 11l5 3.5L12 6l4 8.5L21 11l-2 9"/>
+      </svg>
+    </div>
+    <div>
+      <h1 id="transition-title">Round 1 done</h1>
+      <div class="subtitle">Review and start next round</div>
+    </div>
+  </header>
+
+  <div class="round-content" id="transition-content"></div>
+
+  <div class="footer" style="display:flex;gap:8px">
+    <button class="cta-btn secondary-btn" onclick="showScreen('round')">← Back</button>
+    <button class="cta-btn" onclick="startNextRound()">Round <span id="next-round-num">2</span> →</button>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN 4 — LEADERBOARD
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-leaderboard">
+
+  <header class="app-header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 20h18"/>
+        <path d="M5 20 3 11l5 3.5L12 6l4 8.5L21 11l-2 9"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Results</h1>
+      <div class="subtitle">Final leaderboard</div>
+    </div>
+  </header>
+
+  <div class="round-content" id="leaderboard-content"></div>
+
+  <div class="footer">
+    <button class="cta-btn secondary-btn" onclick="newEvent()">New event</button>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
