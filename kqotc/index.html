@@ -59,6 +59,12 @@
 
   </div>
 
+  <div class="debug-bar" style="display:none">
+    <span class="debug-label">DEBUG</span>
+    <input id="debug-n" class="debug-input" type="number" value="24" min="1" max="60" inputmode="numeric" />
+    <button class="debug-btn" onclick="debugFillPlayers()">Fill players</button>
+  </div>
+
   <div class="footer">
     <button class="cta-btn" id="start-btn" onclick="startEvent()" disabled>
       Start event
@@ -87,6 +93,11 @@
   </header>
 
   <div class="round-content" id="round-content"></div>
+
+  <div class="debug-bar" style="display:none">
+    <span class="debug-label">DEBUG</span>
+    <button class="debug-btn" onclick="debugRandomScores()">Random scores</button>
+  </div>
 
   <div class="footer">
     <button class="cta-btn" onclick="endRound()">End round →</button>

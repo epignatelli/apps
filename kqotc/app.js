@@ -1,3 +1,6 @@
+// ─── Debug ─────────────────────────────────────────────────────────────────────
+const DEBUG = false;
+
 // ─── State ─────────────────────────────────────────────────────────────────────
 let players    = [];   // { id, name, cumScore }
 let round      = 0;
@@ -323,9 +326,36 @@ function newEvent() {
   renderCheckin();
 }
 
+// ─── Debug helpers ─────────────────────────────────────────────────────────────
+const _DEBUG_NAMES = [
+  'Alice','Bob','Charlie','Diana','Eve','Frank','Grace','Henry',
+  'Iris','Jack','Kate','Leo','Mia','Noah','Olivia','Paul',
+  'Quinn','Rachel','Sam','Tina','Uma','Victor','Wendy','Xavier',
+  'Yara','Zoe','Aaron','Bella','Carlos','Demi','Elliot','Fiona'
+];
+
+function debugFillPlayers() {
+  const n = Math.max(1, parseInt(document.getElementById('debug-n').value) || 24);
+  players = [];
+  const pool = [..._DEBUG_NAMES].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < n; i++) {
+    const name = pool[i % pool.length] + (i >= pool.length ? ` ${Math.floor(i / pool.length) + 1}` : '');
+    players.push({ id: Date.now() + i, name, cumScore: 0 });
+  }
+  savePlayers();
+  renderCheckin();
+}
+
+function debugRandomScores() {
+  topTeams.forEach(t => { t.roundScore = Math.floor(Math.random() * 25) + 1; });
+  workUp.forEach(wu => { wu.roundScore = Math.floor(Math.random() * 15) + 1; });
+  renderRound();
+}
+
 // ─── Service worker ────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 loadPlayers();
 renderCheckin();
+if (DEBUG) document.querySelectorAll('.debug-bar').forEach(el => el.style.display = 'flex');
