@@ -3,7 +3,8 @@ const STORE_KEY    = 'vb-roster-v1';
 const SETTINGS_KEY = 'vb-settings-v1';
 
 function saveRoster() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(players)); } catch(e) {}
+  const serializable = players.map(p => ({ ...p, positions: [...p.positions] }));
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(serializable)); } catch(e) {}
 }
 function loadRoster() {
   try {
@@ -445,8 +446,8 @@ if ('serviceWorker' in navigator) {
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 loadSettings();
 loadRoster();
-// Re-hydrate position Sets (JSON doesn't serialise Set)
-players = players.map(p => ({ ...p, positions: new Set(p.positions) }));
+// Re-hydrate position Sets (JSON serialises Set as {}, so we store as arrays)
+players = players.map(p => ({ ...p, positions: new Set(Array.isArray(p.positions) ? p.positions : []) }));
 document.getElementById('min-women-val').textContent = minWomen;
 renderRoster();
 validateSetup();
