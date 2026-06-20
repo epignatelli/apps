@@ -139,7 +139,8 @@ function renderRound() {
         <input class="score-input" type="number" min="0" inputmode="numeric"
           value="${t.roundScore}"
           onfocus="this.select()"
-          oninput="setTeamScore(${t.id}, this.value, this)" />
+          oninput="setTeamScore(${t.id}, this.value, this)"
+          onblur="blurTeamScore(${t.id}, this)" />
       </div>`;
   }).join('');
 
@@ -154,7 +155,8 @@ function renderRound() {
         <input class="score-input" type="number" min="0" inputmode="numeric"
           value="${wu.roundScore}"
           onfocus="this.select()"
-          oninput="setWorkScore(${wu.playerId}, this.value, this)" />
+          oninput="setWorkScore(${wu.playerId}, this.value, this)"
+          onblur="blurWorkScore(${wu.playerId}, this)" />
       </div>`;
   }).join('') : '<div class="empty-note">No players on work-up this round</div>';
 
@@ -182,12 +184,28 @@ function setTeamScore(id, val, el) {
   if (t) t.roundScore = n;
 }
 
+function blurTeamScore(id, el) {
+  const t = topTeams.find(t => t.id === id);
+  if (parseScore(el.value) === null) {
+    el.value = t ? t.roundScore : 0;
+    el.classList.remove('input-error');
+  }
+}
+
 function setWorkScore(playerId, val, el) {
   const n = parseScore(val);
   if (n === null) { el.classList.add('input-error'); return; }
   el.classList.remove('input-error');
   const wu = workUp.find(w => w.playerId === playerId);
   if (wu) wu.roundScore = n;
+}
+
+function blurWorkScore(playerId, el) {
+  const wu = workUp.find(w => w.playerId === playerId);
+  if (parseScore(el.value) === null) {
+    el.value = wu ? wu.roundScore : 0;
+    el.classList.remove('input-error');
+  }
 }
 
 // ─── End round ─────────────────────────────────────────────────────────────────
@@ -209,25 +227,30 @@ function endRound() {
 function renderTransition({ moversUp, movingDownTeams, stayTeams, newTeams, stayWorkUp }) {
   const name = id => esc(getPlayer(id)?.name ?? '—');
 
-  const upList = moversUp.map(wu =>
-    `<div class="move-row up"><span class="move-name">${name(wu.playerId)}</span><span class="move-score">${wu.roundScore} pts</span></div>`
-  ).join('') || '<div class="empty-note">—</div>';
-
   const downList = movingDownTeams.map(t =>
     `<div class="move-row down"><span class="move-name">${t.playerIds.map(name).join(', ')}</span><span class="move-score">${t.roundScore} pts</span></div>`
   ).join('') || '<div class="empty-note">—</div>';
 
-  const nextKingCards = [...stayTeams.map(t => ({ ...t, isNew: false })), ...newTeams.map(t => ({ ...t, isNew: true }))].map((t, i) => {
-    const label = t.isNew ? '★ New' : '↩ Stay';
-    return `
-      <div class="team-card ${t.isNew ? 'team-new' : 'team-stay'}">
-        <div class="team-badge">${label}</div>
-        <div class="team-names">${t.playerIds.map(name).join(', ')}</div>
-      </div>`;
-  }).join('');
+  const nextKingCards = [
+    ...stayTeams.map(t => ({ ...t, isNew: false, scoreLabel: `${t.roundScore} pts this round` })),
+    ...newTeams.map((t, i) => {
+      const slice = moversUp.slice(i * 4, i * 4 + 4);
+      return { ...t, isNew: true, scoreLabel: slice.map(wu => wu.roundScore).join(' / ') + ' pts' };
+    })
+  ].map(t => `
+    <div class="team-card ${t.isNew ? 'team-new' : 'team-stay'}">
+      <div class="team-names">
+        <span class="team-badge">${t.isNew ? '★ New' : '↩ Stay'}</span>
+        ${t.playerIds.map(name).join(', ')}
+        <span class="cum-score">${t.scoreLabel}</span>
+      </div>
+    </div>`).join('');
 
-  const nextWorkRows = [...movingDownTeams.flatMap(t => t.playerIds), ...stayWorkUp.map(wu => wu.playerId)].map(pid =>
-    `<div class="workup-row"><span class="player-name">${name(pid)}</span></div>`
+  const nextWorkRows = [
+    ...movingDownTeams.flatMap(t => t.playerIds.map(pid => ({ pid, score: t.roundScore, tag: '↓ ' }))),
+    ...stayWorkUp.map(wu => ({ pid: wu.playerId, score: wu.roundScore, tag: '' }))
+  ].map(({ pid, score, tag }) =>
+    `<div class="workup-row"><span class="player-name">${name(pid)}<span class="cum-score">${tag}${score} pts this round</span></span></div>`
   ).join('') || '<div class="empty-note">—</div>';
 
   document.getElementById('transition-content').innerHTML = `
