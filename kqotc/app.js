@@ -391,7 +391,12 @@ function renderRound() {
     <div class="court-section">
       <div class="court-label workup">↑ Work-up Court</div>
       ${workRows}
+    </div>
+    <div class="court-section">
+      <div class="court-label" style="color:var(--muted)">Player submissions — Round ${round}</div>
+      <div id="submitted-scores"></div>
     </div>`;
+  _updateSubmittedScores();
 }
 
 let _toastTimer = null;
