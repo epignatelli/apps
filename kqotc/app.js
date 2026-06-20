@@ -462,9 +462,20 @@ function renderTransition({ moversUp, movingDownTeams, stayTeams, newTeams, stay
   const name     = id => esc(getPlayer(id)?.name ?? '—');
   const total    = id => getPlayer(id)?.cumScore ?? 0;
   const avgTotal = ids => Math.round(ids.reduce((s, id) => s + total(id), 0) / ids.length);
+  const chips    = ids => ids.map(id => {
+    const p = getPlayer(id);
+    const ok = p && p.submittedRound === round && p.submittedScore !== undefined;
+    return `<span class="sub-chip${ok ? ' submitted' : ''}" data-sub="${id}">${esc(p?.name ?? '—')}: ${ok ? p.submittedScore + ' pts' : '—'}</span>`;
+  }).join('');
 
-  const downList = movingDownTeams.map(t =>
-    `<div class="move-row down"><span class="move-name">${t.playerIds.map(name).join(', ')}</span><span class="move-score">${t.roundScore} pts · <b>${avgTotal(t.playerIds)} total</b></span></div>`
+  const downList = movingDownTeams.map(t => `
+    <div class="move-row down">
+      <div class="move-main">
+        <span class="move-name">${t.playerIds.map(name).join(', ')}</span>
+        <span class="move-score">${t.roundScore} pts · <b>${avgTotal(t.playerIds)} total</b></span>
+      </div>
+      <div class="team-subs">${chips(t.playerIds)}</div>
+    </div>`
   ).join('') || '<div class="empty-note">—</div>';
 
   const nextKingCards = [
@@ -475,19 +486,27 @@ function renderTransition({ moversUp, movingDownTeams, stayTeams, newTeams, stay
     }),
   ].map(t => `
     <div class="team-card ${t.isNew ? 'team-new' : 'team-stay'}">
-      <div class="team-names">
-        <span class="team-badge">${t.isNew ? '★ New' : '↩ Stay'}</span>
-        ${t.playerIds.map(name).join(', ')}
-        <span class="cum-score">${t.roundLabel} · <b>${t.totalLabel}</b></span>
+      <div class="team-card-left">
+        <div class="team-names">
+          <span class="team-badge">${t.isNew ? '★ New' : '↩ Stay'}</span>
+          ${t.playerIds.map(name).join(', ')}
+          <span class="cum-score">${t.roundLabel} · <b>${t.totalLabel}</b></span>
+        </div>
+        <div class="team-subs">${chips(t.playerIds)}</div>
       </div>
     </div>`).join('');
 
   const nextWorkRows = [
     ...movingDownTeams.flatMap(t => t.playerIds.map(pid => ({ pid, score: t.roundScore }))),
     ...stayWorkUp.map(wu => ({ pid: wu.playerId, score: wu.roundScore })),
-  ].map(({ pid, score }) =>
-    `<div class="workup-row"><span class="player-name">${name(pid)}<span class="cum-score">${score} pts · <b>${total(pid)} total</b></span></span></div>`
-  ).join('') || '<div class="empty-note">—</div>';
+  ].map(({ pid, score }) => {
+    const p = getPlayer(pid);
+    const ok = p && p.submittedRound === round && p.submittedScore !== undefined;
+    return `<div class="workup-row">
+      <span class="player-name">${name(pid)}<span class="cum-score">${score} pts · <b>${total(pid)} total</b></span></span>
+      <span class="sub-hint${ok ? ' submitted' : ''}" data-sub="${pid}">${ok ? p.submittedScore + ' pts' : '—'}</span>
+    </div>`;
+  }).join('') || '<div class="empty-note">—</div>';
 
   document.getElementById('transition-content').innerHTML = `
     <div class="court-section">
@@ -501,10 +520,6 @@ function renderTransition({ moversUp, movingDownTeams, stayTeams, newTeams, stay
     <div class="court-section">
       <div class="court-label workup">↑ Work-up — Round ${round + 1}</div>
       ${nextWorkRows}
-    </div>
-    <div class="court-section">
-      <div class="court-label" style="color:var(--muted)">Player submissions — Round ${round}</div>
-      <div id="submitted-scores"></div>
     </div>`;
   _updateSubmittedScores();
 }

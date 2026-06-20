@@ -358,14 +358,14 @@ body {
 /* Movement rows */
 .move-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  gap: 8px;
 }
 .move-row.up   { background: var(--green-bg);  }
 .move-row.down { background: var(--red-bg);    }
+.move-main { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .move-name { font-size: 13px; font-weight: 500; flex: 1; }
 .move-score { font-size: 12px; color: var(--muted); font-weight: 600; }
 
