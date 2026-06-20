@@ -247,7 +247,7 @@ body {
   gap: 10px;
 }
 
-.player-item .gender-toggle { height: 28px; }
+.player-item .gender-toggle { height: 28px; display: flex; }
 .player-item .gender-toggle button { width: 28px; font-size: 13px; }
 
 .player-name-text { font-size: 14px; font-weight: 500; flex: 1; }
