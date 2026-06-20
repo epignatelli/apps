@@ -76,7 +76,10 @@
 
       <!-- Roster -->
       <div class="roster-header">
-        <span class="step-label" style="margin-bottom:0">Roster</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="step-label" style="margin-bottom:0">Roster</span>
+          <span class="roster-count" id="roster-count"></span>
+        </div>
         <button id="clear-roster-btn" class="clear-roster-btn" onclick="clearRoster()" style="display:none">Clear all</button>
       </div>
       <div id="roster-list" class="player-list"></div>

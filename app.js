@@ -201,7 +201,9 @@ function renderRoster() {
   const list = document.getElementById('roster-list');
   const empty = document.getElementById('roster-empty');
 
-  const clearBtn = document.getElementById('clear-roster-btn');
+  const clearBtn  = document.getElementById('clear-roster-btn');
+  const countEl   = document.getElementById('roster-count');
+  if (countEl) countEl.textContent = players.length || '';
   if (!players.length) {
     list.innerHTML = '';
     empty.style.display = 'block';
