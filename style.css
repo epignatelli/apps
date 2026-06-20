@@ -165,6 +165,10 @@ body {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background .15s, color .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 .gender-toggle button.active-m { background: rgba(167,139,250,0.22); color: var(--purple); }
 .gender-toggle button.active-f { background: rgba(34,201,122,0.22);  color: var(--green);  }
