@@ -298,7 +298,6 @@ body {
   transition: border-color .15s;
 }
 .score-input:focus { border-color: var(--amber); }
-.score-input.input-error { border-color: var(--red); color: var(--red); }
 .score-input::-webkit-inner-spin-button,
 .score-input::-webkit-outer-spin-button { -webkit-appearance: none; }
 
@@ -379,3 +378,24 @@ body {
   transition: border-color .15s, color .15s;
 }
 .end-tourney-btn:active { border-color: var(--red); color: var(--red); }
+
+/* ─── Toast ───────────────────────────────────────── */
+#score-toast {
+  position: fixed;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--red);
+  color: #fff;
+  font-family: var(--sport);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 10px 20px;
+  border-radius: var(--pill);
+  white-space: nowrap;
+  z-index: 999;
+  transition: top .22s ease;
+  pointer-events: none;
+}
+#score-toast.visible { top: calc(16px + env(safe-area-inset-top)); }

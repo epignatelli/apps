@@ -171,6 +171,20 @@ function renderRound() {
     </div>`;
 }
 
+let _toastTimer = null;
+function showToast(msg) {
+  let el = document.getElementById('score-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'score-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('visible'), 2200);
+}
+
 function parseScore(val) {
   const n = parseInt(val);
   return isNaN(n) ? null : Math.max(0, n);
@@ -178,34 +192,26 @@ function parseScore(val) {
 
 function setTeamScore(id, val, el) {
   const n = parseScore(val);
-  if (n === null) { el.classList.add('input-error'); return; }
-  el.classList.remove('input-error');
+  if (n === null) { showToast('Invalid score — numbers only'); return; }
   const t = topTeams.find(t => t.id === id);
   if (t) t.roundScore = n;
 }
 
 function blurTeamScore(id, el) {
   const t = topTeams.find(t => t.id === id);
-  if (parseScore(el.value) === null) {
-    el.value = t ? t.roundScore : 0;
-    el.classList.remove('input-error');
-  }
+  if (parseScore(el.value) === null) el.value = t ? t.roundScore : 0;
 }
 
 function setWorkScore(playerId, val, el) {
   const n = parseScore(val);
-  if (n === null) { el.classList.add('input-error'); return; }
-  el.classList.remove('input-error');
+  if (n === null) { showToast('Invalid score — numbers only'); return; }
   const wu = workUp.find(w => w.playerId === playerId);
   if (wu) wu.roundScore = n;
 }
 
 function blurWorkScore(playerId, el) {
   const wu = workUp.find(w => w.playerId === playerId);
-  if (parseScore(el.value) === null) {
-    el.value = wu ? wu.roundScore : 0;
-    el.classList.remove('input-error');
-  }
+  if (parseScore(el.value) === null) el.value = wu ? wu.roundScore : 0;
 }
 
 // ─── End round ─────────────────────────────────────────────────────────────────
