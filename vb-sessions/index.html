@@ -76,8 +76,12 @@
         <div class="field-row">
           <div class="field">
             <label class="field-label">Coach</label>
-            <input class="field-input" type="text" id="form-coach" placeholder="Name" maxlength="60"
-              autocomplete="off" autocorrect="off" spellcheck="false" />
+            <select class="field-input field-select" id="form-coach-select" onchange="onCoachSelectChange()">
+              <option value="">None</option>
+            </select>
+            <input class="field-input" type="text" id="form-coach-custom" placeholder="Coach name"
+              maxlength="60" autocomplete="off" autocorrect="off" spellcheck="false"
+              style="display:none; margin-top:6px" />
           </div>
           <div class="field">
             <label class="field-label">Level</label>
@@ -97,12 +101,19 @@
           </div>
           <div class="field">
             <label class="field-label">Cost (£)</label>
-            <input class="field-input" type="number" id="form-cost" min="0" step="0.5" inputmode="decimal" placeholder="0" />
+            <input class="field-input" type="number" id="form-cost" min="0" step="0.5" inputmode="decimal" placeholder="0" oninput="updateCostPreview()" />
+            <div class="field-hint" id="form-cost-preview">Free session — no payment required</div>
           </div>
         </div>
         <div class="field">
           <label class="field-label">Registration deadline</label>
           <input class="field-input" type="datetime-local" id="form-deadline" />
+        </div>
+        <div class="field">
+          <label class="toggle-row">
+            <input type="checkbox" id="form-ask-positions" />
+            <span class="toggle-label-text">Ask players for their position when registering</span>
+          </label>
         </div>
         <div class="field">
           <label class="field-label">Status</label>
@@ -171,6 +182,98 @@
 
 </div>
 
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN — SESSION RUN
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-session-run">
+
+  <header class="app-header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Session start checklist</h1>
+      <div class="subtitle" id="run-subtitle"></div>
+    </div>
+    <button class="back-btn" onclick="closeSessionRun()">← Session</button>
+  </header>
+
+  <div class="run-content" id="run-content"></div>
+
+  <div class="footer">
+    <button class="cta-btn" onclick="openSessionEnd()">End session →</button>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN — SESSION END
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-session-end">
+
+  <header class="app-header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Session end checklist</h1>
+      <div class="subtitle" id="end-subtitle"></div>
+    </div>
+    <button class="back-btn" onclick="closeSessionEnd()">← Checklist</button>
+  </header>
+
+  <div class="run-content" id="end-content"></div>
+
+  <div class="footer">
+    <button class="cta-btn" onclick="closeSession()">Close session →</button>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     OVERLAY — ONE-TIME PROFILE
+══════════════════════════════════════════════════ -->
+<div class="overlay" id="profile-form-overlay">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Quick intro</span>
+      <button class="panel-close" onclick="closeProfileForm()">✕</button>
+    </div>
+    <p class="panel-intro" id="profile-intro"></p>
+    <div class="form-fields">
+      <div class="field" id="profile-gender-field">
+        <label class="field-label">Gender</label>
+        <select class="field-input field-select" id="profile-gender">
+          <option value="">Select…</option>
+          <option value="man">Man</option>
+          <option value="woman">Woman</option>
+          <option value="nonbinary">Non-binary</option>
+        </select>
+      </div>
+      <div class="field" id="profile-positions-field">
+        <label class="field-label">Position (select all that apply)</label>
+        <div class="pos-toggles" id="profile-positions">
+          <label class="pos-toggle setter"><input type="checkbox" value="setter" />S · Setter</label>
+          <label class="pos-toggle hitter"><input type="checkbox" value="hitter" />H · Hitter</label>
+          <label class="pos-toggle middle"><input type="checkbox" value="middle" />M · Middle</label>
+          <label class="pos-toggle libero"><input type="checkbox" value="libero" />L · Libero</label>
+        </div>
+      </div>
+    </div>
+    <div class="form-error" id="profile-form-error"></div>
+    <button class="cta-btn" onclick="submitProfileForm()">Continue →</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>

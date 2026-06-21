@@ -5,8 +5,20 @@ let _isAdmin      = false;
 let _isCoach      = false;
 let _legacyAdmin  = false;   // cached check against admins/{email} collection
 let _userDocUnsub = null;    // unsubscribe fn for own user doc listener
-let _editingId            = null;   // session ID being edited, null when creating
-let _pendingJoinSessionId = null;   // session to join after sign-in completes
+let _editingId              = null;   // session ID being edited, null when creating
+let _pendingJoinSessionId   = null;   // session to join after sign-in completes
+let _pendingProfileNeeds    = {};     // { needsGender, needsPositions } for profile overlay
+let _editingAttendeeSession = null;   // sessionId when editing own attendee entry (positions)
+
+// ─── Toast ─────────────────────────────────────────────────────────────────────
+let _toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('visible'), 3500);
+}
 
 // ─── Firebase ──────────────────────────────────────────────────────────────────
 function getDb()   { return firebase.firestore(); }
@@ -88,16 +100,16 @@ function _updateAuthUI() {
 }
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
+let _initialRouted = false;
+
 getAuth().onAuthStateChanged(async user => {
   _currentUser = user;
 
   if (_userDocUnsub) { _userDocUnsub(); _userDocUnsub = null; }
 
   if (user) {
-    // Immediate update so the button reflects sign-in right away
     _updateAuthUI();
 
-    // Check legacy admin collection (bootstrap path)
     try {
       const adminDoc = await getDb().collection('admins').doc(user.email).get();
       _legacyAdmin = adminDoc.exists;
@@ -105,12 +117,13 @@ getAuth().onAuthStateChanged(async user => {
 
     _isAdmin = _legacyAdmin;
     _updateAuthUI();
-    renderHome();  // immediate render with legacy-admin status
+
+    if (!_initialRouted) { _initialRouted = true; await _routeFromHash(); }
+    else renderHome();
 
     await _upsertUserDoc(user);
-    _subscribeToUserDoc(user);  // snapshot re-renders when roles load
+    _subscribeToUserDoc(user);
 
-    // Complete a pending session join triggered before sign-in
     if (_pendingJoinSessionId) {
       const sid = _pendingJoinSessionId;
       _pendingJoinSessionId = null;
@@ -122,7 +135,8 @@ getAuth().onAuthStateChanged(async user => {
     _isCoach = false;
     _legacyAdmin = false;
     _updateAuthUI();
-    renderHome();
+    if (!_initialRouted) { _initialRouted = true; await _routeFromHash(); }
+    else renderHome();
   }
 });
 
@@ -136,7 +150,33 @@ function showScreen(id) {
   document.getElementById('screen-' + id).classList.add('active');
 }
 
+function _setHash(hash) {
+  history.replaceState(null, '', '#' + hash);
+}
+
+async function _routeFromHash() {
+  const hash = location.hash.replace(/^#\/?/, '');
+  if (!hash || hash === 'home') { renderHome(); return; }
+  if (hash === 'users')         { if (_isAdmin) openUsersScreen(); else renderHome(); return; }
+  const slash = hash.indexOf('/');
+  const section = slash > -1 ? hash.slice(0, slash) : hash;
+  const id      = slash > -1 ? hash.slice(slash + 1) : '';
+  if (section === 'session' && id)  { await openSession(id); }
+  else if (section === 'run'  && id)  { await openSessionRun(id); }
+  else if (section === 'end'  && id)  {
+    try {
+      await _loadRunSessionData(id);
+      document.getElementById('end-subtitle').textContent =
+        document.getElementById('run-subtitle').textContent;
+      showScreen('session-end');
+      _renderSessionEnd();
+    } catch(e) { renderHome(); }
+  }
+  else { renderHome(); }
+}
+
 function goHome() {
+  _setHash('home');
   showScreen('home');
   renderHome();
 }
@@ -150,6 +190,17 @@ function _formatDate(ts) {
 function _formatCost(cost) {
   if (!cost) return 'Free';
   return `£${Number(cost).toFixed(2).replace(/\.00$/, '')}`;
+}
+
+function _playerPrice(adminPrice) {
+  if (!adminPrice || adminPrice <= 0) return 0;
+  const gross = (adminPrice + 0.20) / (1 - 0.015);
+  return Math.ceil(gross / 0.50) * 0.50;  // round up to nearest 50p
+}
+
+function _formatPlayerPrice(adminPrice) {
+  const p = _playerPrice(adminPrice);
+  return p === 0 ? 'Free' : `£${p.toFixed(2).replace(/\.00$/, '')}`;
 }
 
 function _spotsLeft(session, attendeeCount) {
@@ -191,11 +242,11 @@ async function renderHome() {
 }
 
 function _renderSessionCard(s) {
-  const statusClass = s.status === 'cancelled' ? 'cancelled' : s.status === 'full' ? 'full' : 'open';
-  const statusLabel = s.status === 'cancelled' ? 'Cancelled' : s.status === 'full' ? 'Full' : 'Open';
+  const statusClass = s.status === 'cancelled' ? 'cancelled' : s.status === 'full' ? 'full' : s.status === 'closed' ? 'closed' : 'open';
+  const statusLabel = s.status === 'cancelled' ? 'Cancelled' : s.status === 'full' ? 'Full' : s.status === 'closed' ? 'Closed' : 'Open';
   const dateStr     = _formatDate(s.date);
   const timeStr     = s.time || '';
-  const costStr     = _formatCost(s.cost);
+  const costStr     = _formatPlayerPrice(s.cost);
   const countStr    = s.attendeeCount != null ? `${s.attendeeCount}/${s.maxPlayers}` : `0/${s.maxPlayers}`;
   const levelLabel  = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[s.level] || '';
   return `
@@ -221,6 +272,7 @@ function _renderSessionCard(s) {
 
 // ─── Session detail ────────────────────────────────────────────────────────────
 async function openSession(id) {
+  _setHash('session/' + id);
   showScreen('detail');
   const content = document.getElementById('detail-content');
   const footer  = document.getElementById('detail-footer');
@@ -255,6 +307,7 @@ function _renderDetail(session, attendees, isAttending, content, footer) {
   const knownCount     = _currentUser ? attendees.length : (session.attendeeCount || 0);
   const spotsLeft      = _spotsLeft(session, knownCount);
   const isCancelled    = session.status === 'cancelled';
+  const isClosed       = session.status === 'closed';
   const isFull         = spotsLeft === 0 && !isAttending;
   const deadlinePassed = session.registrationDeadline && session.registrationDeadline.toDate() < new Date();
   const levelLabel     = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[session.level] || '';
@@ -269,7 +322,7 @@ function _renderDetail(session, attendees, isAttending, content, footer) {
         <div class="detail-meta-row"><span class="detail-meta-label">Date</span><span>${esc(_formatDate(session.date))}${session.time ? ` at ${esc(session.time)}` : ''}</span></div>
         ${session.coach ? `<div class="detail-meta-row"><span class="detail-meta-label">Coach</span><span>${esc(session.coach)}</span></div>` : ''}
         ${levelLabel ? `<div class="detail-meta-row"><span class="detail-meta-label">Level</span><span>${esc(levelLabel)}</span></div>` : ''}
-        <div class="detail-meta-row"><span class="detail-meta-label">Cost</span><span>${esc(_formatCost(session.cost))}</span></div>
+        <div class="detail-meta-row"><span class="detail-meta-label">Cost</span><span>${esc(_formatPlayerPrice(session.cost))}</span></div>
         <div class="detail-meta-row"><span class="detail-meta-label">Spots</span><span>${knownCount} / ${session.maxPlayers}${isCancelled ? '' : ` · ${spotsLeft} left`}</span></div>
         ${deadlineStr ? `<div class="detail-meta-row"><span class="detail-meta-label">Deadline</span><span${deadlinePassed ? ' style="color:var(--red)"' : ''}>${esc(deadlineStr)}${deadlinePassed ? ' · closed' : ''}</span></div>` : ''}
         ${isCancelled ? `<div class="detail-meta-row"><span class="detail-badge cancelled">Cancelled</span></div>` : ''}
@@ -283,18 +336,42 @@ function _renderDetail(session, attendees, isAttending, content, footer) {
         ? '<div class="empty-note">Sign in to see who\'s coming.</div>'
         : attendees.length ? `
           <div class="attendee-list">
-            ${attendees.map((a, i) => `
+            ${attendees.map((a, i) => {
+              const genderSym   = { man: '♂', woman: '♀', nonbinary: '⚧' }[a.gender] || '';
+              const genderClass = { man: 'gender-m', woman: 'gender-w', nonbinary: 'gender-nb' }[a.gender] || '';
+              const posSet      = new Set(a.positions || []);
+              const POS = { setter: 'S', hitter: 'H', middle: 'M', libero: 'L' };
+              const posChips = session.askPositions
+                ? Object.entries(POS).map(([key, label]) =>
+                    `<span class="att-chip${posSet.has(key) ? ' on-' + key : ''}">${label}</span>`
+                  ).join('')
+                : '';
+              const isOwn = _currentUser && a.id === _currentUser.uid;
+              return `
               <div class="attendee-row">
                 <span class="attendee-num">${i + 1}</span>
+                ${genderSym ? `<span class="attendee-gender ${genderClass}">${genderSym}</span>` : ''}
                 <span class="attendee-name">${esc(a.name)}</span>
+                ${posChips ? `<div class="att-chips">${posChips}</div>` : ''}
                 ${_isAdmin ? `<span class="attendee-email">${esc(a.email || '')}</span>` : ''}
+                ${isOwn && session.askPositions ? `<button class="icon-btn small" onclick="openEditPositions('${session.id}','${Array.from(posSet).join(',')}')" title="Edit positions">✎</button>` : ''}
                 ${_isAdmin ? `<button class="icon-btn danger small" onclick="removeAttendee('${session.id}','${a.id}')" title="Remove">✕</button>` : ''}
-              </div>`).join('')}
+              </div>`;
+            }).join('')}
           </div>` : '<div class="empty-note">No one signed up yet.</div>'}
     </div>`;
 
-  if (isCancelled) {
+  const canStart = _isAdmin || (_currentUser && session.coachUid && session.coachUid === _currentUser.uid);
+  if (isClosed) {
+    footer.innerHTML = `
+      <button class="cta-btn" disabled>Session closed</button>
+      ${canStart && session.report ? `<button class="cta-btn secondary-btn" onclick="openSessionEndReport('${session.id}')">View report</button>` : ''}`;
+  } else if (isCancelled) {
     footer.innerHTML = `<button class="cta-btn" disabled>Session cancelled</button>`;
+  } else if (canStart) {
+    footer.innerHTML = `
+      <button class="cta-btn" onclick="openSessionRun('${session.id}')">▶ Start session</button>
+      ${isAttending ? `<button class="cta-btn secondary-btn" onclick="cancelRegistration('${session.id}')">Cancel</button>` : ''}`;
   } else if (isAttending) {
     footer.innerHTML = `<button class="cta-btn secondary-btn" onclick="cancelRegistration('${session.id}')">Cancel my registration</button>`;
   } else if (isFull) {
@@ -312,13 +389,42 @@ async function register(sessionId) {
     await handleAuthClick();
     return;
   }
+
+  try {
+    const [userDoc, sessionDoc] = await Promise.all([
+      _userRef(_currentUser.uid).get(),
+      _sessionRef(sessionId).get(),
+    ]);
+    const needsGender    = !userDoc.data()?.gender;
+    const needsPositions = sessionDoc.data()?.askPositions === true;
+
+    if (needsGender || needsPositions) {
+      openProfileForm(sessionId, needsGender, needsPositions);
+      return;
+    }
+  } catch(e) { console.error('Profile check failed:', e); }
+
+  await _doRegister(sessionId);
+}
+
+async function _doRegister(sessionId, extra = {}) {
   const btn = document.querySelector('#detail-footer .cta-btn');
   if (btn) btn.disabled = true;
   try {
+    // Include gender from user doc if not already in extra
+    if (!extra.gender) {
+      try {
+        const userDoc = await _userRef(_currentUser.uid).get();
+        const g = userDoc.data()?.gender;
+        if (g) extra = { ...extra, gender: g };
+      } catch(e) {}
+    }
+
     await _attendeesRef(sessionId).doc(_currentUser.uid).set({
       name:     _currentUser.displayName || _currentUser.email,
       email:    _currentUser.email || '',
       joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      ...extra,
     });
     await _sessionRef(sessionId).update({
       attendeeCount: firebase.firestore.FieldValue.increment(1),
@@ -326,6 +432,7 @@ async function register(sessionId) {
     await openSession(sessionId);
   } catch(e) {
     console.error('Register failed:', e);
+    showToast('Couldn\'t join session. Try again.');
     if (btn) btn.disabled = false;
   }
 }
@@ -343,6 +450,7 @@ async function cancelRegistration(sessionId) {
     await openSession(sessionId);
   } catch(e) {
     console.error('Cancel registration failed:', e);
+    showToast('Couldn\'t cancel registration. Try again.');
     if (btn) btn.disabled = false;
   }
 }
@@ -356,12 +464,13 @@ async function removeAttendee(sessionId, uid) {
       attendeeCount: firebase.firestore.FieldValue.increment(-1),
     });
     await openSession(sessionId);
-  } catch(e) { console.error('Remove attendee failed:', e); }
+  } catch(e) { console.error('Remove attendee failed:', e); showToast('Couldn\'t remove attendee. Try again.'); }
 }
 
 // ─── Users screen ──────────────────────────────────────────────────────────────
 function openUsersScreen() {
   if (!_isAdmin) return;
+  _setHash('users');
   showScreen('users');
   renderUsers();
 }
@@ -424,13 +533,140 @@ async function toggleRole(uid, role) {
     renderUsers();
   } catch(e) {
     console.error('Toggle role failed:', e);
-    alert(e.code === 'permission-denied'
-      ? 'Permission denied. Add Firestore rules for the users/ collection (see README).'
-      : `Couldn't update role: ${e.message}`);
+    showToast(e.code === 'permission-denied'
+      ? 'Permission denied — check Firestore rules for users/.'
+      : 'Couldn\'t update role. Try again.');
+  }
+}
+
+// ─── One-time profile form ─────────────────────────────────────────────────────
+function openProfileForm(sessionId, needsGender, needsPositions) {
+  _pendingJoinSessionId = sessionId;
+  _pendingProfileNeeds  = { needsGender, needsPositions };
+
+  document.getElementById('profile-form-error').textContent = '';
+  document.getElementById('profile-gender-field').style.display    = needsGender    ? '' : 'none';
+  document.getElementById('profile-positions-field').style.display = needsPositions ? '' : 'none';
+  if (needsGender)    document.getElementById('profile-gender').value = '';
+  if (needsPositions) document.querySelectorAll('#profile-positions input').forEach(cb => cb.checked = false);
+
+  const count = (needsGender ? 1 : 0) + (needsPositions ? 1 : 0);
+  document.getElementById('profile-intro').textContent =
+    count === 1 ? 'One quick question before you join.' : 'Two quick questions before you join.';
+
+  document.getElementById('profile-form-overlay').classList.add('open');
+}
+
+function closeProfileForm() {
+  document.getElementById('profile-form-overlay').classList.remove('open');
+  _pendingJoinSessionId   = null;
+  _pendingProfileNeeds    = {};
+  _editingAttendeeSession = null;
+}
+
+function openEditPositions(sessionId, positionsStr) {
+  _editingAttendeeSession = sessionId;
+  _pendingJoinSessionId   = null;
+  _pendingProfileNeeds    = { needsGender: false, needsPositions: true };
+  const posSet = new Set(positionsStr ? positionsStr.split(',') : []);
+  document.getElementById('profile-form-error').textContent = '';
+  document.getElementById('profile-gender-field').style.display    = 'none';
+  document.getElementById('profile-positions-field').style.display = '';
+  document.querySelectorAll('#profile-positions input').forEach(cb => { cb.checked = posSet.has(cb.value); });
+  document.getElementById('profile-intro').textContent = 'Update your positions for this session.';
+  document.getElementById('profile-form-overlay').classList.add('open');
+}
+
+async function submitProfileForm() {
+  const { needsGender, needsPositions } = _pendingProfileNeeds;
+  const errorEl = document.getElementById('profile-form-error');
+
+  let gender, positions;
+  if (needsGender) {
+    gender = document.getElementById('profile-gender').value;
+    if (!gender) { errorEl.textContent = 'Please select a gender.'; return; }
+  }
+  if (needsPositions) {
+    positions = Array.from(document.querySelectorAll('#profile-positions input:checked')).map(el => el.value);
+    if (!positions.length) { errorEl.textContent = 'Please select at least one position.'; return; }
+  }
+
+  errorEl.textContent = '';
+  const btn = document.querySelector('#profile-form-overlay .cta-btn');
+  btn.disabled = true;
+
+  if (_editingAttendeeSession) {
+    const sid = _editingAttendeeSession;
+    _editingAttendeeSession = null;
+    _pendingProfileNeeds    = {};
+    document.getElementById('profile-form-overlay').classList.remove('open');
+    try {
+      await _attendeesRef(sid).doc(_currentUser.uid).update({ positions });
+      await openSession(sid);
+    } catch(e) {
+      console.error('Update positions failed:', e);
+      errorEl.textContent = 'Couldn\'t save. Try again.';
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  try {
+    if (needsGender) await _userRef(_currentUser.uid).update({ gender });
+
+    const sid = _pendingJoinSessionId;
+    _pendingJoinSessionId = null;
+    _pendingProfileNeeds  = {};
+    document.getElementById('profile-form-overlay').classList.remove('open');
+    if (sid) await _doRegister(sid, {
+      ...(needsGender && gender ? { gender } : {}),
+      ...(positions             ? { positions } : {}),
+    });
+  } catch(e) {
+    console.error('Save profile failed:', e);
+    errorEl.textContent = 'Couldn\'t save. Try again.';
+    btn.disabled = false;
   }
 }
 
 // ─── Create / Edit session ─────────────────────────────────────────────────────
+async function _loadCoachOptions(currentCoach, currentCoachUid) {
+  const sel    = document.getElementById('form-coach-select');
+  const custom = document.getElementById('form-coach-custom');
+  sel.innerHTML = '<option value="">None</option>';
+  try {
+    const snap = await _usersRef().where('roles', 'array-contains', 'coach').get();
+    snap.docs.forEach(d => {
+      const name = d.data().name || d.data().email || '';
+      if (!name) return;
+      const opt = document.createElement('option');
+      opt.value = d.id; opt.textContent = name;  // value = UID
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.error('Failed to load coaches:', e); }
+  const customOpt = document.createElement('option');
+  customOpt.value = '__custom__'; customOpt.textContent = 'Custom…';
+  sel.appendChild(customOpt);
+
+  if (currentCoachUid && Array.from(sel.options).find(o => o.value === currentCoachUid)) {
+    sel.value = currentCoachUid;
+    custom.style.display = 'none'; custom.value = '';
+  } else if (currentCoach) {
+    sel.value = '__custom__';
+    custom.style.display = ''; custom.value = currentCoach;
+  } else {
+    sel.value = ''; custom.style.display = 'none'; custom.value = '';
+  }
+}
+
+function onCoachSelectChange() {
+  const sel    = document.getElementById('form-coach-select');
+  const custom = document.getElementById('form-coach-custom');
+  const isCustom = sel.value === '__custom__';
+  custom.style.display = isCustom ? '' : 'none';
+  if (isCustom) custom.focus();
+}
+
 function openSessionForm(id = null) {
   if (!_isAdmin) return;
   _editingId = id;
@@ -451,13 +687,22 @@ function openSessionForm(id = null) {
       document.getElementById('form-date').value        = d  ? d.toISOString().slice(0, 10) : '';
       document.getElementById('form-time').value        = s.time || '';
       document.getElementById('form-venue').value       = s.venue || '';
-      document.getElementById('form-coach').value       = s.coach || '';
       document.getElementById('form-level').value       = s.level || '';
+      _loadCoachOptions(s.coach || '', s.coachUid || '');
       document.getElementById('form-description').value = s.description || '';
       document.getElementById('form-max').value         = s.maxPlayers || '';
       document.getElementById('form-cost').value        = s.cost != null ? s.cost : '';
-      document.getElementById('form-deadline').value    = dl ? dl.toISOString().slice(0, 16) : '';
-      document.getElementById('form-status').value      = s.status || 'open';
+      document.getElementById('form-deadline').value        = dl ? dl.toISOString().slice(0, 16) : '';
+      const statusSel = document.getElementById('form-status');
+      // Ensure 'closed' option exists when editing a closed session
+      if (s.status === 'closed' && !statusSel.querySelector('option[value="closed"]')) {
+        const opt = document.createElement('option');
+        opt.value = 'closed'; opt.textContent = 'Closed';
+        statusSel.appendChild(opt);
+      }
+      statusSel.value = s.status || 'open';
+      document.getElementById('form-ask-positions').checked = s.askPositions || false;
+      updateCostPreview();
     });
   } else {
     titleEl.textContent  = 'New session';
@@ -466,16 +711,29 @@ function openSessionForm(id = null) {
     document.getElementById('form-date').value        = now.toISOString().slice(0, 10);
     document.getElementById('form-time').value        = '10:00';
     document.getElementById('form-venue').value       = '';
-    document.getElementById('form-coach').value       = '';
     document.getElementById('form-level').value       = '';
+    _loadCoachOptions('');
     document.getElementById('form-description').value = '';
     document.getElementById('form-max').value         = '12';
     document.getElementById('form-cost').value        = '0';
-    document.getElementById('form-deadline').value    = '';
-    document.getElementById('form-status').value      = 'open';
+    document.getElementById('form-deadline').value        = '';
+    const statusSel = document.getElementById('form-status');
+    statusSel.querySelector('option[value="closed"]')?.remove();
+    statusSel.value = 'open';
+    document.getElementById('form-ask-positions').checked = false;
+    updateCostPreview();
   }
 
   document.getElementById('session-form-overlay').classList.add('open');
+}
+
+function updateCostPreview() {
+  const val      = parseFloat(document.getElementById('form-cost').value) || 0;
+  const preview  = document.getElementById('form-cost-preview');
+  const pp       = _playerPrice(val);
+  preview.textContent = pp === 0
+    ? 'Free session — no payment required'
+    : `Players will be charged £${pp.toFixed(2)} (covers card processing)`;
 }
 
 function closeSessionForm() {
@@ -488,7 +746,11 @@ async function submitSessionForm() {
   const dateVal     = document.getElementById('form-date').value;
   const timeVal     = document.getElementById('form-time').value;
   const venueVal    = document.getElementById('form-venue').value.trim();
-  const coachVal    = document.getElementById('form-coach').value.trim();
+  const coachSel    = document.getElementById('form-coach-select').value;
+  const coachUidVal = (coachSel && coachSel !== '__custom__') ? coachSel : '';
+  const coachVal    = coachSel === '__custom__'
+    ? document.getElementById('form-coach-custom').value.trim()
+    : (coachSel ? document.querySelector(`#form-coach-select option[value="${coachSel}"]`)?.textContent || '' : '');
   const levelVal    = document.getElementById('form-level').value;
   const descVal     = document.getElementById('form-description').value.trim();
   const maxVal      = parseInt(document.getElementById('form-max').value);
@@ -510,10 +772,13 @@ async function submitSessionForm() {
     time:                 timeVal,
     venue:                venueVal,
     coach:                coachVal,
+    coachUid:             coachUidVal,
     level:                levelVal,
     description:          descVal,
     maxPlayers:           maxVal,
     cost:                 costVal,
+    playerPrice:          _playerPrice(costVal),
+    askPositions:         document.getElementById('form-ask-positions').checked,
     registrationDeadline: deadlineVal
       ? firebase.firestore.Timestamp.fromDate(new Date(deadlineVal))
       : null,
@@ -550,7 +815,526 @@ async function deleteSession(id, venue) {
     batch.delete(_sessionRef(id));
     await batch.commit();
     renderHome();
-  } catch(e) { console.error('Delete session failed:', e); }
+  } catch(e) { console.error('Delete session failed:', e); showToast('Couldn\'t delete session. Try again.'); }
+}
+
+// ─── Session run ───────────────────────────────────────────────────────────────
+const EQUIPMENT_ITEMS = [
+  { key: 'volleyballs', label: 'Volleyballs',   type: 'count' },
+  { key: 'tennis',      label: 'Tennis balls',  type: 'count' },
+  { key: 'cones',       label: 'Cones',          type: 'count' },
+  { key: 'hoops',       label: 'Setting hoops',  type: 'count' },
+];
+
+let _runSession   = null;
+let _runAttendees = [];
+let _runNumTeams  = 2;
+let _runTeams     = null;
+
+function _equipKey(sessionId) { return `vb-run-equip-${sessionId}`; }
+function _getEquipState(sessionId) {
+  try {
+    const data = JSON.parse(localStorage.getItem(_equipKey(sessionId)) || '{}');
+    return Array.isArray(data) ? {} : data;  // discard legacy Set-as-array format
+  }
+  catch { return {}; }
+}
+function _saveEquipState(sessionId, state) {
+  localStorage.setItem(_equipKey(sessionId), JSON.stringify(state));
+}
+
+function toggleEquipment(sessionId, key) {
+  const state = _getEquipState(sessionId);
+  state[key] = !state[key];
+  _saveEquipState(sessionId, state);
+  _renderSessionRun();
+}
+
+function setEquipCount(sessionId, key, value) {
+  const state = _getEquipState(sessionId);
+  state[key] = Math.max(0, parseInt(value) || 0);
+  _saveEquipState(sessionId, state);
+}
+
+async function _loadRunSessionData(sessionId) {
+  _runTeams = null;
+  const [sessionDoc, attendeesSnap] = await Promise.all([
+    _sessionRef(sessionId).get(),
+    _attendeesRef(sessionId).orderBy('joinedAt', 'asc').get(),
+  ]);
+  _runSession   = { id: sessionDoc.id, ...sessionDoc.data() };
+  _runAttendees = attendeesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  document.getElementById('run-subtitle').textContent =
+    [_formatDate(_runSession.date), _runSession.time].filter(Boolean).join(' · ');
+}
+
+async function openSessionRun(sessionId) {
+  _setHash('run/' + sessionId);
+  showScreen('session-run');
+  const content = document.getElementById('run-content');
+  content.innerHTML = '<div class="home-empty">Loading…</div>';
+  try {
+    await _loadRunSessionData(sessionId);
+    _renderSessionRun();
+  } catch(e) {
+    content.innerHTML = '<div class="home-empty">Couldn\'t load session.</div>';
+    console.error(e);
+  }
+}
+
+function closeSessionRun() {
+  if (_runSession) openSession(_runSession.id); else goHome();
+}
+
+function _renderSessionRun() {
+  const content   = document.getElementById('run-content');
+  const session   = _runSession;
+  const attendees = _runAttendees;
+  const equipState    = _getEquipState(session.id);
+  const presentCount  = attendees.filter(a => a.present).length;
+
+  const equipRows = EQUIPMENT_ITEMS.map(({ key, label, type }) => {
+    if (type === 'count') {
+      const count = equipState[key] || 0;
+      return `
+      <div class="checklist-row equip-row${count > 0 ? ' checked' : ''}">
+        <input class="equip-count" type="number" min="0" inputmode="numeric"
+          value="${count || ''}" placeholder="0"
+          oninput="setEquipCount('${session.id}','${key}',this.value)" />
+        <span>${label}</span>
+      </div>`;
+    } else {
+      const checked = !!equipState[key];
+      return `
+      <label class="checklist-row equip-row${checked ? ' checked' : ''}">
+        <input type="checkbox" ${checked ? 'checked' : ''}
+          onchange="toggleEquipment('${session.id}','${key}')" />
+        <span>${label}</span>
+      </label>`;
+    }
+  }).join('');
+
+  const POS = { setter: 'S', hitter: 'H', middle: 'M', libero: 'L' };
+  const attendeeRows = attendees.map(a => {
+    const gSym   = { man: '♂', woman: '♀', nonbinary: '⚧' }[a.gender] || '';
+    const gClass = { man: 'gender-m', woman: 'gender-w', nonbinary: 'gender-nb' }[a.gender] || '';
+    const posSet = new Set(a.positions || []);
+    const chips  = session.askPositions
+      ? Object.entries(POS).map(([k, l]) =>
+          `<span class="att-chip${posSet.has(k) ? ' on-' + k : ''}">${l}</span>`
+        ).join('') : '';
+    return `
+    <label class="checklist-row${a.present ? ' checked' : ''}">
+      <input type="checkbox" ${a.present ? 'checked' : ''}
+        onchange="togglePresent('${session.id}','${a.id}',${!!a.present})" />
+      ${gSym ? `<span class="attendee-gender ${gClass}">${gSym}</span>` : ''}
+      <span class="checklist-name">${esc(a.name)}</span>
+      ${chips ? `<div class="att-chips">${chips}</div>` : ''}
+    </label>`;
+  }).join('');
+
+  const teamsSection = presentCount >= 2 ? `
+    <div class="teams-num-row">
+      <span class="teams-num-label">Teams</span>
+      <input class="teams-num-input" type="number" id="run-num-teams"
+        min="2" max="6" value="${_runNumTeams}" inputmode="numeric"
+        oninput="_runNumTeams=Math.max(2,parseInt(this.value)||2)" />
+      <button class="cta-btn teams-build-btn" onclick="buildTeamsInRun()">Build →</button>
+    </div>
+    ${_runTeams ? _renderRunTeams(_runTeams) : ''}` : '<div class="empty-note">Mark attendance first.</div>';
+
+  content.innerHTML = `
+    <div class="run-section">
+      <div class="run-section-title">Equipment</div>
+      <div class="checklist">${equipRows}</div>
+    </div>
+    <div class="run-section">
+      <div class="run-section-title">
+        Attendance
+        <span class="run-count">${presentCount} / ${attendees.length}</span>
+      </div>
+      <div class="checklist">${attendees.length ? attendeeRows : '<div class="empty-note">No registrations yet.</div>'}</div>
+    </div>
+    <div class="run-section">
+      <div class="run-section-title">Teams</div>
+      ${teamsSection}
+    </div>`;
+}
+
+async function togglePresent(sessionId, uid, currentVal) {
+  const next = !currentVal;
+  const i = _runAttendees.findIndex(a => a.id === uid);
+  if (i >= 0) _runAttendees[i].present = next;
+  _runTeams = null;
+  _renderSessionRun();
+  try {
+    await _attendeesRef(sessionId).doc(uid).update({ present: next });
+  } catch(e) {
+    console.error('Toggle present failed:', e);
+    showToast('Couldn\'t update attendance. Try again.');
+    if (i >= 0) _runAttendees[i].present = currentVal;
+    _renderSessionRun();
+  }
+}
+
+function buildTeamsInRun() {
+  const numTeams = Math.max(2, parseInt(document.getElementById('run-num-teams')?.value) || 2);
+  _runNumTeams = numTeams;
+  const present = _runAttendees.filter(a => a.present);
+  const women  = present.filter(p => p.gender === 'woman').sort(() => Math.random() - .5);
+  const others = present.filter(p => p.gender !== 'woman').sort(() => Math.random() - .5);
+  const teams  = Array.from({ length: numTeams }, () => []);
+  [...women, ...others].forEach((p, i) => teams[i % numTeams].push(p));
+  _runTeams = teams;
+  _renderSessionRun();
+}
+
+function _renderRunTeams(teams) {
+  return `<div class="teams-grid">
+    ${teams.map((team, i) => `
+      <div class="team-card">
+        <div class="team-card-title">Team ${i + 1}</div>
+        ${team.map(p => {
+          const sym = { man: '♂', woman: '♀', nonbinary: '⚧' }[p.gender] || '';
+          const cls = { man: 'gender-m', woman: 'gender-w', nonbinary: 'gender-nb' }[p.gender] || '';
+          return `<div class="team-player">
+            ${sym ? `<span class="attendee-gender ${cls}">${sym}</span>` : ''}
+            <span>${esc(p.name)}</span>
+          </div>`;
+        }).join('')}
+      </div>`).join('')}
+  </div>`;
+}
+
+// ─── Session end ───────────────────────────────────────────────────────────────
+function _endEquipKey(sessionId) { return `vb-end-equip-${sessionId}`; }
+function _getEndEquipState(sessionId) {
+  try { return JSON.parse(localStorage.getItem(_endEquipKey(sessionId)) || '{}'); }
+  catch { return {}; }
+}
+function _saveEndEquipState(sessionId, state) {
+  localStorage.setItem(_endEquipKey(sessionId), JSON.stringify(state));
+}
+
+function openSessionEnd() {
+  if (!_runSession) return;
+  _setHash('end/' + _runSession.id);
+  document.getElementById('end-subtitle').textContent =
+    document.getElementById('run-subtitle').textContent;
+  showScreen('session-end');
+  _renderSessionEnd();
+}
+
+function closeSessionEnd() {
+  _setHash('run/' + _runSession.id);
+  showScreen('session-run');
+}
+
+function _renderSessionEnd() {
+  const content    = document.getElementById('end-content');
+  const footer     = document.querySelector('#screen-session-end .footer');
+  const session    = _runSession;
+
+  if (session.status === 'closed' && session.report) {
+    _renderReport(session.report, session);
+    return;
+  }
+
+  if (footer) footer.innerHTML =
+    `<button class="cta-btn" onclick="closeSession()">Close session →</button>`;
+  const startState = _getEquipState(session.id);
+  const endState   = _getEndEquipState(session.id);
+
+  const rows = EQUIPMENT_ITEMS.map(({ key, label }) => {
+    const startCount = startState[key] || 0;
+    const endVal     = endState[key];
+    const hasEnd     = typeof endVal === 'number';
+    const diff       = hasEnd ? startCount - endVal : null;
+    const diffHtml =
+      !hasEnd || startCount === 0 ? `<span class="end-diff" id="end-diff-${key}"></span>` :
+      diff <= 0                   ? `<span class="end-diff ok"  id="end-diff-${key}">✓</span>` :
+                                    `<span class="end-diff bad" id="end-diff-${key}">−${diff}</span>`;
+    return `
+    <div class="end-equip-row">
+      <span class="end-equip-label">${label}</span>
+      <span class="end-equip-start">${startCount > 0 ? startCount : '—'}</span>
+      <input class="equip-count" type="number" min="0" inputmode="numeric"
+        value="${hasEnd ? endVal : ''}" placeholder="0"
+        oninput="setEndEquipCount('${session.id}','${key}',this.value)" />
+      ${diffHtml}
+    </div>`;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="run-section">
+      <div class="run-section-title">Equipment check</div>
+      <div class="end-equip-header">
+        <span></span>
+        <span class="end-col-label">Start</span>
+        <span class="end-col-label">End</span>
+        <span></span>
+      </div>
+      <div class="end-equip-list">${rows}</div>
+      <div class="end-summary" id="end-summary"></div>
+    </div>`;
+
+  _updateEndSummary(session.id);
+}
+
+function setEndEquipCount(sessionId, key, value) {
+  const state = _getEndEquipState(sessionId);
+  state[key]  = Math.max(0, parseInt(value) || 0);
+  _saveEndEquipState(sessionId, state);
+
+  const startCount = _getEquipState(sessionId)[key] || 0;
+  const diffEl     = document.getElementById(`end-diff-${key}`);
+  if (diffEl && startCount > 0) {
+    const diff     = startCount - state[key];
+    diffEl.textContent = diff <= 0 ? '✓' : `−${diff}`;
+    diffEl.className   = `end-diff ${diff <= 0 ? 'ok' : 'bad'}`;
+  }
+  _updateEndSummary(sessionId);
+}
+
+function _updateEndSummary(sessionId) {
+  const el         = document.getElementById('end-summary');
+  if (!el) return;
+  const startState = _getEquipState(sessionId);
+  const endState   = _getEndEquipState(sessionId);
+  const relevant   = EQUIPMENT_ITEMS.filter(({ key }) => (startState[key] || 0) > 0);
+  const answered   = relevant.filter(({ key }) => typeof endState[key] === 'number');
+  if (!answered.length) { el.textContent = ''; el.className = 'end-summary'; return; }
+
+  const missing = answered.filter(({ key }) => endState[key] < (startState[key] || 0));
+  if (missing.length) {
+    el.className  = 'end-summary bad';
+    el.innerHTML  = '<strong>Missing:</strong> ' +
+      missing.map(({ key, label }) =>
+        `${(startState[key] || 0) - endState[key]} ${label.toLowerCase()}`
+      ).join(', ');
+  } else {
+    el.className  = 'end-summary ok';
+    el.textContent = 'All equipment accounted for ✓';
+  }
+}
+
+async function closeSession() {
+  if (!_currentUser || !_runSession) return;
+  if (!confirm('Close this session and generate its report?')) return;
+
+  const session          = _runSession;
+  const startState       = _getEquipState(session.id);
+  const endState         = _getEndEquipState(session.id);
+  const presentAttendees = _runAttendees.filter(a => a.present);
+  const noShows          = _runAttendees.length - presentAttendees.length;
+
+  const missingEquip = EQUIPMENT_ITEMS
+    .filter(({ key }) => (startState[key] || 0) > 0 && typeof endState[key] === 'number' && endState[key] < startState[key])
+    .map(({ key, label }) => ({ key, label, count: startState[key] - endState[key] }));
+
+  const genderBreakdown = {
+    women:   presentAttendees.filter(a => a.gender === 'woman').length,
+    men:     presentAttendees.filter(a => a.gender === 'man').length,
+    other:   presentAttendees.filter(a => a.gender === 'nonbinary').length,
+    unknown: presentAttendees.filter(a => !a.gender).length,
+  };
+
+  const positionBreakdown = session.askPositions ? {
+    setter: presentAttendees.filter(a => (a.positions || []).includes('setter')).length,
+    hitter: presentAttendees.filter(a => (a.positions || []).includes('hitter')).length,
+    middle: presentAttendees.filter(a => (a.positions || []).includes('middle')).length,
+    libero: presentAttendees.filter(a => (a.positions || []).includes('libero')).length,
+  } : null;
+
+  const playerPrice = parseFloat(session.cost) || 0;
+
+  const report = {
+    closedAt:     firebase.firestore.FieldValue.serverTimestamp(),
+    closedBy:     _currentUser.uid,
+    closedByName: _currentUser.displayName || _currentUser.email || '',
+    venue:        session.venue        || '',
+    date:         session.date         || null,
+    time:         session.time         || '',
+    coach:        session.coach        || '',
+    level:        session.level        || '',
+    cost:         playerPrice,
+    maxPlayers:   session.maxPlayers   || 0,
+    description:  session.description  || '',
+    askPositions: !!session.askPositions,
+    attendance: {
+      registered: _runAttendees.length,
+      present:    presentAttendees.length,
+      noShows,
+      attendees:  _runAttendees.map(a => ({
+        name: a.name, gender: a.gender || null, present: !!a.present,
+      })),
+    },
+    equipment: {
+      start:   startState,
+      end:     endState,
+      missing: missingEquip,
+    },
+    stats: {
+      fillRate:       session.maxPlayers
+                        ? Math.round(presentAttendees.length / session.maxPlayers * 100) : null,
+      attendanceRate: _runAttendees.length
+                        ? Math.round(presentAttendees.length / _runAttendees.length * 100) : null,
+      genderBreakdown,
+      positionBreakdown,
+      revenue: playerPrice > 0 ? {
+        playerPrice,
+        expected:     playerPrice * _runAttendees.length,
+        actual:       playerPrice * presentAttendees.length,
+        noShowImpact: playerPrice * noShows,
+      } : null,
+    },
+  };
+
+  const btn = document.querySelector('#screen-session-end .footer .cta-btn');
+  if (btn) btn.disabled = true;
+  try {
+    await _sessionRef(session.id).update({ status: 'closed', report });
+    _runSession = { ..._runSession, status: 'closed', report };
+    _renderReport(report, session);
+  } catch(e) {
+    console.error('Close session failed:', e);
+    showToast('Couldn\'t close session. Try again.');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _renderReport(report, session) {
+  const content = document.getElementById('end-content');
+  const footer  = document.querySelector('#screen-session-end .footer');
+  if (footer) footer.innerHTML =
+    `<button class="cta-btn secondary-btn" onclick="openSession('${session.id}')">← Back to session</button>`;
+
+  const gSym = { man: '♂', woman: '♀', nonbinary: '⚧' };
+  const gCls = { man: 'gender-m', woman: 'gender-w', nonbinary: 'gender-nb' };
+  const att  = report.attendance || {};
+  const st   = report.stats      || {};
+  const eq   = report.equipment  || {};
+
+  // ── Attendance list ─────────────────────────────────────────────────────────
+  const attendeeRows = (att.attendees || []).map(a => `
+    <div class="report-row${a.present ? '' : ' report-absent'}">
+      <span class="report-tick">${a.present ? '✓' : '✗'}</span>
+      ${a.gender ? `<span class="attendee-gender ${gCls[a.gender] || ''}">${gSym[a.gender] || ''}</span>` : ''}
+      <span>${esc(a.name)}</span>
+    </div>`).join('');
+
+  // ── Equipment list ───────────────────────────────────────────────────────────
+  const equipRows = EQUIPMENT_ITEMS.map(({ key, label }) => {
+    const start  = (eq.start || {})[key] || 0;
+    const end    = (eq.end   || {})[key];
+    const hasEnd = typeof end === 'number';
+    if (!start && !hasEnd) return '';
+    const diff = hasEnd ? start - end : null;
+    return `
+    <div class="report-equip-row">
+      <span>${label}</span>
+      <span class="report-equip-counts">
+        ${start || '—'}${hasEnd ? ` → ${end}` : ''}
+        ${diff === null ? '' : diff > 0
+          ? `<span class="end-diff bad">−${diff}</span>`
+          : `<span class="end-diff ok">✓</span>`}
+      </span>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  // ── Statistics rows ──────────────────────────────────────────────────────────
+  const meta = (label, value) =>
+    `<div class="detail-meta-row"><span class="detail-meta-label">${label}</span><span>${value}</span></div>`;
+
+  const gb = st.genderBreakdown || {};
+  const genderParts = [
+    gb.women  ? `${gb.women}♀`  : '',
+    gb.men    ? `${gb.men}♂`    : '',
+    gb.other  ? `${gb.other}⚧`  : '',
+  ].filter(Boolean);
+
+  const pb = st.positionBreakdown;
+  const positionParts = pb ? [
+    pb.setter ? `${pb.setter} S` : '',
+    pb.hitter ? `${pb.hitter} H` : '',
+    pb.middle ? `${pb.middle} M` : '',
+    pb.libero ? `${pb.libero} L` : '',
+  ].filter(Boolean) : [];
+
+  const statsRows = [
+    st.fillRate       != null ? meta('Fill rate',       `${st.fillRate}% (${att.present}/${report.maxPlayers || '?'})`) : '',
+    st.attendanceRate != null ? meta('Attendance rate', `${st.attendanceRate}% (${att.present}/${att.registered} registered)`) : '',
+    att.noShows       > 0    ? meta('No-shows',        att.noShows) : '',
+    genderParts.length       ? meta('Gender split',    genderParts.join(' · ')) : '',
+    positionParts.length     ? meta('Positions',       positionParts.join(' · ')) : '',
+  ].filter(Boolean).join('');
+
+  // ── Revenue rows ─────────────────────────────────────────────────────────────
+  const rev = st.revenue;
+  const fmt = n => `£${Number.isInteger(n) ? n : n.toFixed(2)}`;
+  const revenueSection = rev ? `
+    <div class="run-section">
+      <div class="run-section-title">Revenue</div>
+      <div class="detail-meta-grid">
+        ${meta('Per player',  fmt(rev.playerPrice))}
+        ${meta('Expected',    `${fmt(rev.expected)} (${att.registered} registered)`)}
+        ${meta('Actual',      `${fmt(rev.actual)} (${att.present} present)`)}
+        ${rev.noShowImpact > 0 ? meta('No-show gap', `${fmt(rev.noShowImpact)} (${att.noShows} no-shows)`) : ''}
+      </div>
+    </div>` : '';
+
+  // ── Session info ──────────────────────────────────────────────────────────────
+  const closedDate = report.closedAt?.toDate ? _formatDate(report.closedAt) : '';
+  const levelLabels = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' };
+
+  content.innerHTML = `
+    <div class="run-section">
+      <div class="run-section-title">
+        Attendance
+        <span class="run-count">${att.present ?? '?'} / ${att.registered ?? '?'}</span>
+      </div>
+      <div class="report-list">${attendeeRows || '<div class="empty-note">No data.</div>'}</div>
+    </div>
+    <div class="run-section">
+      <div class="run-section-title">Statistics</div>
+      <div class="detail-meta-grid">
+        ${statsRows || '<div class="empty-note">No statistics available.</div>'}
+      </div>
+    </div>
+    <div class="run-section">
+      <div class="run-section-title">Equipment</div>
+      <div class="report-list">${equipRows || '<div class="empty-note">No equipment recorded.</div>'}</div>
+    </div>
+    ${revenueSection}
+    <div class="run-section">
+      <div class="run-section-title">Session info</div>
+      <div class="detail-meta-grid">
+        ${report.venue      ? meta('Venue',      esc(report.venue))                          : ''}
+        ${report.date       ? meta('Date',       _formatDate(report.date))                   : ''}
+        ${report.time       ? meta('Time',       esc(report.time))                           : ''}
+        ${report.coach      ? meta('Coach',      esc(report.coach))                          : ''}
+        ${report.level      ? meta('Level',      levelLabels[report.level] || esc(report.level)) : ''}
+        ${report.cost       ? meta('Cost',       fmt(report.cost) + ' per player')           : ''}
+        ${report.maxPlayers ? meta('Capacity',   report.maxPlayers + ' players')             : ''}
+        ${closedDate        ? meta('Closed',     `${closedDate} by ${esc(report.closedByName)}`) : ''}
+      </div>
+    </div>`;
+}
+
+async function openSessionEndReport(sessionId) {
+  try {
+    await _loadRunSessionData(sessionId);
+    const sessionDoc = await _sessionRef(sessionId).get();
+    _runSession = { id: sessionDoc.id, ...sessionDoc.data() };
+    _setHash('end/' + sessionId);
+    document.getElementById('end-subtitle').textContent =
+      document.getElementById('run-subtitle').textContent;
+    showScreen('session-end');
+    _renderSessionEnd();
+  } catch(e) {
+    console.error(e);
+    showToast('Couldn\'t load report.');
+  }
 }
 
 // ─── Service worker ────────────────────────────────────────────────────────────
