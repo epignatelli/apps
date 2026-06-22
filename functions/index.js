@@ -1,17 +1,34 @@
 'use strict';
 
-const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
-const { defineSecret }                  = require('firebase-functions/params');
-const { initializeApp }                 = require('firebase-admin/app');
-const { getFirestore, FieldValue }      = require('firebase-admin/firestore');
+// Gen 1 functions — avoids Cloud Run IAM org-policy issues with allUsers.
+const functions = require('firebase-functions/v1');
+const { defineSecret } = require('firebase-functions/params');
+const { initializeApp }            = require('firebase-admin/app');
+const { getAuth }                  = require('firebase-admin/auth');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 initializeApp();
 
-const STRIPE_SECRET_KEY    = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_SECRET_KEY     = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const REGION = 'europe-west2';
 
-// Lazy Stripe initializer — secrets are not available at module load time.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+function setCors(res) {
+  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
+}
+
+async function verifyAuth(req) {
+  const auth  = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) throw new Error('Unauthenticated');
+  return getAuth().verifyIdToken(token);
+}
+
 let _stripe;
 function getStripe() {
   if (!_stripe) {
@@ -23,36 +40,41 @@ function getStripe() {
 }
 
 // ── createCheckoutSession ───────────────────────────────────────────────────
-// Called by the client when a player joins a paid session.
-// Returns a Stripe Checkout URL; client redirects there.
-exports.createCheckoutSession = onCall(
-  { region: REGION, secrets: [STRIPE_SECRET_KEY] },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+exports.createCheckoutSession = functions
+  .region(REGION)
+  .runWith({ secrets: [STRIPE_SECRET_KEY] })
+  .https.onRequest(async (req, res) => {
+    setCors(res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method !== 'POST')    return res.status(405).end();
 
-    const { sessionId, successUrl, cancelUrl } = request.data;
+    let decoded;
+    try { decoded = await verifyAuth(req); }
+    catch (e) { return res.status(401).json({ error: e.message }); }
+
+    const { sessionId, successUrl, cancelUrl } = req.body;
     if (!sessionId || !successUrl || !cancelUrl)
-      throw new HttpsError('invalid-argument', 'Missing required fields.');
+      return res.status(400).json({ error: 'Missing required fields.' });
 
     const db  = getFirestore();
-    const uid = request.auth.uid;
+    const uid = decoded.uid;
 
     const [sessionSnap, attendeeSnap] = await Promise.all([
       db.collection('sessions').doc(sessionId).get(),
       db.collection('sessions').doc(sessionId).collection('attendees').doc(uid).get(),
     ]);
 
-    if (!sessionSnap.exists) throw new HttpsError('not-found', 'Session not found.');
+    if (!sessionSnap.exists)
+      return res.status(404).json({ error: 'Session not found.' });
     if (attendeeSnap.exists && attendeeSnap.data().paid)
-      throw new HttpsError('already-exists', 'Already registered and paid.');
+      return res.status(409).json({ error: 'Already registered and paid.' });
 
     const session     = sessionSnap.data();
     const playerPrice = _playerPrice(session.cost || 0);
     if (playerPrice <= 0)
-      throw new HttpsError('invalid-argument', 'This session is free — no payment needed.');
+      return res.status(400).json({ error: 'This session is free.' });
 
-    const stripe = getStripe();
-    const checkout = await stripe.checkout.sessions.create({
+    const checkout = await getStripe().checkout.sessions.create({
       mode: 'payment',
       line_items: [{
         price_data: {
@@ -64,27 +86,24 @@ exports.createCheckoutSession = onCall(
         },
         quantity: 1,
       }],
-      customer_email: request.auth.token.email || undefined,
+      customer_email: decoded.email || undefined,
       metadata: {
         sessionId,
         uid,
-        // Store the base cost (pence) so the webhook knows how much to refund.
         refundAmountPence: String(Math.round((session.cost || 0) * 100)),
       },
       success_url: successUrl,
       cancel_url:  cancelUrl,
     });
 
-    return { url: checkout.url };
-  }
-);
+    return res.json({ url: checkout.url });
+  });
 
 // ── stripeWebhook ───────────────────────────────────────────────────────────
-// Stripe calls this after a successful payment.
-// Creates the attendee doc and increments attendeeCount.
-exports.stripeWebhook = onRequest(
-  { region: REGION, secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
-  async (req, res) => {
+exports.stripeWebhook = functions
+  .region(REGION)
+  .runWith({ secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] })
+  .https.onRequest(async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
     try {
@@ -97,57 +116,58 @@ exports.stripeWebhook = onRequest(
     }
 
     if (event.type === 'checkout.session.completed') {
-      const checkout = event.data.object;
+      const checkout        = event.data.object;
       const { sessionId, uid, refundAmountPence } = checkout.metadata;
       const paymentIntentId = checkout.payment_intent;
 
-      const db           = getFirestore();
-      const sessionRef   = db.collection('sessions').doc(sessionId);
-      const attendeeRef  = sessionRef.collection('attendees').doc(uid);
-      const userDoc      = await db.collection('users').doc(uid).get();
-      const u            = userDoc.exists ? userDoc.data() : {};
+      const db          = getFirestore();
+      const sessionRef  = db.collection('sessions').doc(sessionId);
+      const attendeeRef = sessionRef.collection('attendees').doc(uid);
+      const userDoc     = await db.collection('users').doc(uid).get();
+      const u           = userDoc.exists ? userDoc.data() : {};
 
       await db.runTransaction(async t => {
         const existing = await t.get(attendeeRef);
-        if (existing.exists && existing.data().paid) return; // idempotent
+        if (existing.exists && existing.data().paid) return;
 
         const isNew = !existing.exists;
         t.set(attendeeRef, {
-          name:               u.name  || checkout.customer_details?.name  || '',
-          email:              u.email || checkout.customer_details?.email || '',
-          gender:             u.gender    || null,
-          positions:          u.positions || [],
-          present:            false,
-          paid:               true,
+          name:              u.name  || checkout.customer_details?.name  || '',
+          email:             u.email || checkout.customer_details?.email || '',
+          gender:            u.gender    || null,
+          positions:         u.positions || [],
+          present:           false,
+          paid:              true,
           paymentIntentId,
-          refundAmountPence:  parseInt(refundAmountPence, 10) || 0,
-          paidAt:             FieldValue.serverTimestamp(),
-          joinedAt:           existing.exists ? existing.data().joinedAt : FieldValue.serverTimestamp(),
+          refundAmountPence: parseInt(refundAmountPence, 10) || 0,
+          paidAt:            FieldValue.serverTimestamp(),
+          joinedAt:          existing.exists ? existing.data().joinedAt : FieldValue.serverTimestamp(),
         }, { merge: true });
 
-        if (isNew) {
-          t.update(sessionRef, { attendeeCount: FieldValue.increment(1) });
-        }
+        if (isNew) t.update(sessionRef, { attendeeCount: FieldValue.increment(1) });
       });
     }
 
     res.json({ received: true });
-  }
-);
+  });
 
 // ── cancelAttendeeAndRefund ─────────────────────────────────────────────────
-// Called by the client when a paid player cancels.
-// Issues a partial Stripe refund (base cost only, not the fee), then removes
-// the attendee doc.
-exports.cancelAttendeeAndRefund = onCall(
-  { region: REGION, secrets: [STRIPE_SECRET_KEY] },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+exports.cancelAttendeeAndRefund = functions
+  .region(REGION)
+  .runWith({ secrets: [STRIPE_SECRET_KEY] })
+  .https.onRequest(async (req, res) => {
+    setCors(res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method !== 'POST')    return res.status(405).end();
 
-    const { sessionId } = request.data;
-    if (!sessionId) throw new HttpsError('invalid-argument', 'Missing sessionId.');
+    let decoded;
+    try { decoded = await verifyAuth(req); }
+    catch (e) { return res.status(401).json({ error: e.message }); }
 
-    const uid = request.auth.uid;
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ error: 'Missing sessionId.' });
+
+    const uid = decoded.uid;
     const db  = getFirestore();
 
     const [sessionSnap, attendeeSnap] = await Promise.all([
@@ -155,24 +175,18 @@ exports.cancelAttendeeAndRefund = onCall(
       db.collection('sessions').doc(sessionId).collection('attendees').doc(uid).get(),
     ]);
 
-    if (!sessionSnap.exists)  throw new HttpsError('not-found', 'Session not found.');
-    if (!attendeeSnap.exists) throw new HttpsError('not-found', 'Registration not found.');
+    if (!sessionSnap.exists)  return res.status(404).json({ error: 'Session not found.' });
+    if (!attendeeSnap.exists) return res.status(404).json({ error: 'Registration not found.' });
 
     const session  = sessionSnap.data();
     const attendee = attendeeSnap.data();
 
-    // 24h cancellation cut-off
     if (session.date) {
       const sessionDate = session.date.toDate ? session.date.toDate() : new Date(session.date);
-      const hoursUntil  = (sessionDate - Date.now()) / 36e5;
-      if (hoursUntil < 24)
-        throw new HttpsError(
-          'failed-precondition',
-          'Cancellations are not allowed within 24 hours of the session.'
-        );
+      if ((sessionDate - Date.now()) / 36e5 < 24)
+        return res.status(403).json({ error: 'Cancellations are not allowed within 24 hours of the session.' });
     }
 
-    // Issue partial refund (base cost, not the Stripe surcharge)
     if (attendee.paid && attendee.paymentIntentId) {
       const refundPence = attendee.refundAmountPence || 0;
       if (refundPence > 0) {
@@ -183,7 +197,6 @@ exports.cancelAttendeeAndRefund = onCall(
       }
     }
 
-    // Remove attendee and update count
     const sessionRef  = db.collection('sessions').doc(sessionId);
     const attendeeRef = sessionRef.collection('attendees').doc(uid);
     await db.runTransaction(async t => {
@@ -191,9 +204,8 @@ exports.cancelAttendeeAndRefund = onCall(
       t.update(sessionRef, { attendeeCount: FieldValue.increment(-1) });
     });
 
-    return { refunded: !!(attendee.paid && attendee.paymentIntentId) };
-  }
-);
+    return res.json({ refunded: !!(attendee.paid && attendee.paymentIntentId) });
+  });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function _playerPrice(adminPrice) {

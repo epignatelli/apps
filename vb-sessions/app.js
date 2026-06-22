@@ -26,9 +26,10 @@ let _pendingCheckoutSuccess = null;
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
 let _toastTimer = null;
-function showToast(msg) {
+function showToast(msg, type = 'info') {
   const el = document.getElementById('toast');
   el.textContent = msg;
+  el.classList.toggle('error', type === 'error');
   el.classList.add('visible');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => el.classList.remove('visible'), 3500);
@@ -37,7 +38,21 @@ function showToast(msg) {
 // ─── Firebase ──────────────────────────────────────────────────────────────────
 function getDb()   { return firebase.firestore(); }
 function getAuth() { return firebase.auth(); }
-function getFn()   { return firebase.app().functions('europe-west2'); }
+
+const FN_BASE = 'https://europe-west2-roots-kqotc.cloudfunctions.net';
+async function callFn(name, body) {
+  const token = await _currentUser.getIdToken();
+  const res   = await fetch(`${FN_BASE}/${name}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch(e) { throw new Error(`Server error (${res.status}): ${text.slice(0, 200)}`); }
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
 
 function _sessionsRef()           { return getDb().collection('sessions'); }
 function _sessionRef(id)          { return _sessionsRef().doc(id); }
@@ -449,7 +464,7 @@ async function _doRegister(sessionId, extra = {}) {
     // The webhook creates the attendee doc after payment succeeds.
     if ((session.cost || 0) > 0) {
       const base = window.location.origin + window.location.pathname;
-      const { data } = await getFn().httpsCallable('createCheckoutSession')({
+      const data = await callFn('createCheckoutSession', {
         sessionId,
         successUrl: `${base}?checkout=success&session=${sessionId}`,
         cancelUrl:  `${base}?checkout=cancelled&session=${sessionId}`,
@@ -472,7 +487,7 @@ async function _doRegister(sessionId, extra = {}) {
     await openSession(sessionId);
   } catch(e) {
     console.error('Register failed:', e);
-    showToast(e.message || 'Couldn\'t join session. Try again.');
+    showToast(e.message || 'Couldn\'t join session. Try again.', 'error');
     if (btn) btn.disabled = false;
   }
 }
@@ -496,12 +511,12 @@ async function cancelRegistration(sessionId) {
 
   if (isPaid) {
     try {
-      const { data } = await getFn().httpsCallable('cancelAttendeeAndRefund')({ sessionId });
+      const data = await callFn('cancelAttendeeAndRefund', { sessionId });
       showToast(data.refunded ? 'Cancelled — refund on its way.' : 'Registration cancelled.');
       await openSession(sessionId);
     } catch(e) {
       console.error('Cancel + refund failed:', e);
-      showToast(e.message || 'Couldn\'t cancel. Try again.');
+      showToast(e.message || 'Couldn\'t cancel. Try again.', 'error');
       if (btn) btn.disabled = false;
     }
   } else {
@@ -513,7 +528,7 @@ async function cancelRegistration(sessionId) {
       await openSession(sessionId);
     } catch(e) {
       console.error('Cancel registration failed:', e);
-      showToast('Couldn\'t cancel registration. Try again.');
+      showToast('Couldn\'t cancel registration. Try again.', 'error');
       if (btn) btn.disabled = false;
     }
   }
@@ -528,7 +543,7 @@ async function removeAttendee(sessionId, uid) {
       attendeeCount: firebase.firestore.FieldValue.increment(-1),
     });
     await openSession(sessionId);
-  } catch(e) { console.error('Remove attendee failed:', e); showToast('Couldn\'t remove attendee. Try again.'); }
+  } catch(e) { console.error('Remove attendee failed:', e); showToast('Couldn\'t remove attendee. Try again.', 'error'); }
 }
 
 // ─── Users screen ──────────────────────────────────────────────────────────────
@@ -599,7 +614,7 @@ async function toggleRole(uid, role) {
     console.error('Toggle role failed:', e);
     showToast(e.code === 'permission-denied'
       ? 'Permission denied — check Firestore rules for users/.'
-      : 'Couldn\'t update role. Try again.');
+      : 'Couldn\'t update role. Try again.', 'error');
   }
 }
 
@@ -879,7 +894,7 @@ async function deleteSession(id, venue) {
     batch.delete(_sessionRef(id));
     await batch.commit();
     renderHome();
-  } catch(e) { console.error('Delete session failed:', e); showToast('Couldn\'t delete session. Try again.'); }
+  } catch(e) { console.error('Delete session failed:', e); showToast('Couldn\'t delete session. Try again.', 'error'); }
 }
 
 // ─── Session run ───────────────────────────────────────────────────────────────
@@ -1035,7 +1050,7 @@ async function togglePresent(sessionId, uid, currentVal) {
     await _attendeesRef(sessionId).doc(uid).update({ present: next });
   } catch(e) {
     console.error('Toggle present failed:', e);
-    showToast('Couldn\'t update attendance. Try again.');
+    showToast('Couldn\'t update attendance. Try again.', 'error');
     if (i >= 0) _runAttendees[i].present = currentVal;
     _renderSessionRun();
   }
@@ -1262,7 +1277,7 @@ async function closeSession() {
     _renderReport(report, session);
   } catch(e) {
     console.error('Close session failed:', e);
-    showToast('Couldn\'t close session. Try again.');
+    showToast('Couldn\'t close session. Try again.', 'error');
     if (btn) btn.disabled = false;
   }
 }
@@ -1397,7 +1412,7 @@ async function openSessionEndReport(sessionId) {
     _renderSessionEnd();
   } catch(e) {
     console.error(e);
-    showToast('Couldn\'t load report.');
+    showToast('Couldn\'t load report.', 'error');
   }
 }
 
