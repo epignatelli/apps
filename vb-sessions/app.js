@@ -563,6 +563,9 @@ async function register(sessionId) {
     return;
   }
 
+  const btn = document.querySelector('#detail-footer .cta-btn');
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+
   try {
     const [userDoc, sessionDoc] = await Promise.all([
       _userRef(_currentUser.uid).get(),
@@ -572,10 +575,14 @@ async function register(sessionId) {
     const needsPositions = sessionDoc.data()?.askPositions === true;
 
     if (needsGender || needsPositions) {
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
       openProfileForm(sessionId, needsGender, needsPositions);
       return;
     }
-  } catch(e) { console.error('Profile check failed:', e); }
+  } catch(e) {
+    console.error('Profile check failed:', e);
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  }
 
   await _doRegister(sessionId);
 }

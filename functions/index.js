@@ -261,7 +261,10 @@ exports.stripeWebhook = functions
 
       await db.runTransaction(async t => {
         const existing = await t.get(attendeeRef);
-        if (existing.exists && existing.data().paid) return;
+        if (existing.exists && existing.data().paid) {
+          console.log(`stripeWebhook: skipping duplicate paid registration uid=${uid} sessionId=${sessionId}`);
+          return;
+        }
 
         const isNew = !existing.exists;
         t.set(attendeeRef, {
