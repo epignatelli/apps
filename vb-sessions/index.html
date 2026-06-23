@@ -32,10 +32,11 @@
     </div>
   </div>
   <div class="nav-tabs-row" id="nav-tabs-row" style="display:none">
-    <button class="nav-tab" data-tab="home"     onclick="goHome()">Sessions</button>
-    <button class="nav-tab" data-tab="finances" onclick="openFinancesScreen()">Finances</button>
-    <button class="nav-tab" data-tab="insights" onclick="openInsightsScreen()">Insights</button>
-    <button class="nav-tab" data-tab="admin"    onclick="openAdminScreen()">Admin</button>
+    <button class="nav-tab"            data-tab="home"     onclick="goHome()">Sessions</button>
+    <button class="nav-tab"            data-tab="series"   onclick="openSeriesScreen()">Series</button>
+    <button class="nav-tab admin-tab"  data-tab="finances" onclick="openFinancesScreen()">Finances</button>
+    <button class="nav-tab admin-tab"  data-tab="insights" onclick="openInsightsScreen()">Insights</button>
+    <button class="nav-tab admin-tab"  data-tab="admin"    onclick="openAdminScreen()">Admin</button>
   </div>
 </div>
 
@@ -51,14 +52,6 @@
   <div class="footer">
     <button class="cta-btn" id="home-new-btn" onclick="openSessionForm()" style="display:none">+ New session</button>
   </div>
-  <footer class="roots-footer">
-    <a class="roots-footer-link" href="/">Roots</a>
-    <span class="roots-footer-dot">·</span>
-    <span class="roots-footer-link dim">About</span>
-    <span class="roots-footer-dot">·</span>
-    <span class="roots-footer-link dim">Policy</span>
-  </footer>
-
   <!-- Create / Edit session panel -->
   <div class="overlay" id="session-form-overlay">
     <div class="panel">
@@ -77,6 +70,34 @@
             <input class="field-input" type="time" id="form-time" />
           </div>
         </div>
+        <div class="field-row" id="form-repeat-row">
+          <div class="field">
+            <label class="field-label">Repeat</label>
+            <select class="field-input field-select" id="form-repeat" onchange="onRepeatChange()">
+              <option value="">No repeat</option>
+              <option value="weekly">Every week</option>
+              <option value="biweekly">Every 2 weeks</option>
+              <option value="monthly">Every month</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row" id="form-repeat-end-row" style="display:none">
+          <div class="field">
+            <label class="field-label">End</label>
+            <select class="field-input field-select" id="form-repeat-end-type" onchange="onRepeatEndTypeChange()">
+              <option value="count">After N sessions</option>
+              <option value="date">Until date</option>
+            </select>
+          </div>
+          <div class="field" id="form-repeat-count-wrap">
+            <label class="field-label">Sessions</label>
+            <input class="field-input" type="number" id="form-repeat-count" min="2" max="52" value="4" inputmode="numeric" />
+          </div>
+          <div class="field" id="form-repeat-date-wrap" style="display:none">
+            <label class="field-label">Until</label>
+            <input class="field-input" type="date" id="form-repeat-until" />
+          </div>
+        </div>
         <div class="field">
           <label class="field-label">Venue</label>
           <div class="venue-field-row">
@@ -84,6 +105,37 @@
               <option value="">Select a venue…</option>
             </select>
             <button type="button" class="venue-new-btn" onclick="openVenueForm()">+ New</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Type</label>
+            <select class="field-input field-select" id="form-type">
+              <option value="game">Game</option>
+              <option value="league">League</option>
+              <option value="clinic">Clinic</option>
+              <option value="kqotc">KQOTC</option>
+              <option value="tournament">Tournament</option>
+              <option value="tryout">Tryout</option>
+              <option value="training">Training</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Gender</label>
+            <select class="field-input field-select" id="form-gender">
+              <option value="mixed">Mixed</option>
+              <option value="women">Women</option>
+              <option value="men">Men</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Series <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— optional</span></label>
+          <div class="venue-field-row">
+            <select class="field-input field-select" id="form-series-select">
+              <option value="">None</option>
+            </select>
+            <button type="button" class="venue-new-btn" onclick="openSeriesForm()">+ New</button>
           </div>
         </div>
         <div class="field">
@@ -270,6 +322,21 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════
+     SCREEN — SERIES
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-series">
+
+  <div class="home-content" id="series-list">
+    <div class="home-empty">Loading…</div>
+  </div>
+
+  <div class="footer" id="series-footer" style="display:none">
+    <button class="cta-btn" onclick="openSeriesForm()">+ New series</button>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════
      SCREEN — ADMIN HUB
 ══════════════════════════════════════════════════ -->
 <div class="screen" id="screen-admin">
@@ -322,6 +389,50 @@
     <div style="display:flex;gap:8px">
       <button class="cta-btn secondary-btn" id="venue-delete-btn" onclick="deleteVenue()" style="display:none">Delete</button>
       <button class="cta-btn" id="venue-submit-btn" onclick="submitVenueForm()" style="flex:1">Save venue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Series form overlay ────────────────────────────────────────────────── -->
+<div class="overlay" id="series-form-overlay">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title" id="series-form-title">New series</span>
+      <button class="panel-close" onclick="closeSeriesForm()">✕</button>
+    </div>
+    <div class="field">
+      <label class="field-label">Name <span style="color:var(--red)">*</span></label>
+      <input class="field-input" type="text" id="sf-name" placeholder="e.g. Summer League 2026" maxlength="80" />
+    </div>
+    <div class="field">
+      <label class="field-label">Description</label>
+      <textarea class="field-input field-textarea" id="sf-description" placeholder="What is this series about?" maxlength="400"></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label class="field-label">Start date</label>
+        <input class="field-input" type="date" id="sf-start" />
+      </div>
+      <div class="field">
+        <label class="field-label">End date</label>
+        <input class="field-input" type="date" id="sf-end" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label class="field-label">Price (£)</label>
+        <input class="field-input" type="number" id="sf-cost" min="0" step="0.5" inputmode="decimal" placeholder="0" />
+        <div class="field-hint">0 = free series pass</div>
+      </div>
+      <div class="field">
+        <label class="field-label">Max members</label>
+        <input class="field-input" type="number" id="sf-max-players" min="1" max="200" inputmode="numeric" placeholder="e.g. 20" />
+      </div>
+    </div>
+    <p id="series-form-error" style="color:var(--red);font-size:13px;min-height:18px"></p>
+    <div style="display:flex;gap:8px">
+      <button class="cta-btn secondary-btn" id="series-delete-btn" onclick="deleteSeries()" style="display:none">Delete</button>
+      <button class="cta-btn" id="series-submit-btn" onclick="submitSeriesForm()" style="flex:1">Save series</button>
     </div>
   </div>
 </div>

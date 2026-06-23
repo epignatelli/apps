@@ -159,6 +159,125 @@ exports.createCheckoutSession = functions
     return res.json({ url: checkout.url });
   });
 
+// ── createSeriesCheckoutSession ─────────────────────────────────────────────
+exports.createSeriesCheckoutSession = functions
+  .region(REGION)
+  .runWith({ secrets: [STRIPE_SECRET_KEY] })
+  .https.onRequest(async (req, res) => {
+    setCors(res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method !== 'POST')    return res.status(405).end();
+
+    let decoded;
+    try { decoded = await verifyAuth(req); }
+    catch (e) { return res.status(401).json({ error: e.message }); }
+
+    const { seriesId, successUrl, cancelUrl, inviteToken } = req.body;
+    if (!seriesId || !successUrl || !cancelUrl)
+      return res.status(400).json({ error: 'Missing required fields.' });
+
+    const db  = getFirestore();
+    const uid = decoded.uid;
+
+    const [seriesSnap, regSnap] = await Promise.all([
+      db.collection('series').doc(seriesId).get(),
+      db.collection('series').doc(seriesId).collection('registrations').doc(uid).get(),
+    ]);
+
+    if (!seriesSnap.exists) return res.status(404).json({ error: 'Series not found.' });
+    if (regSnap.exists && regSnap.data().paymentStatus === 'paid')
+      return res.status(409).json({ error: 'Already registered for this series.' });
+
+    const series      = seriesSnap.data();
+    const cost        = series.cost || 0;
+    const maxPlayers  = series.maxPlayers || 0;
+    const memberCount = series.memberCount || 0;
+    const isFull      = maxPlayers > 0 && memberCount >= maxPlayers;
+
+    // If full, validate the invite token server-side against Firestore
+    let inviteValid = false;
+    if (isFull && inviteToken) {
+      const inviteSnap = await db.collection('series').doc(seriesId).collection('invites').doc(inviteToken).get();
+      inviteValid = inviteSnap.exists;
+    }
+
+    if (isFull && !inviteValid) {
+      return res.status(409).json({ error: 'Series is full.' });
+    }
+
+    const userDoc = await db.collection('users').doc(uid).get();
+    const u       = userDoc.exists ? userDoc.data() : {};
+    const name    = u.name  || decoded.name  || '';
+    const email   = u.email || decoded.email || '';
+
+    // Free series — enrol directly without Stripe
+    if (cost <= 0) {
+      if (isFull && inviteValid) {
+        await db.collection('series').doc(seriesId).update({ maxPlayers: FieldValue.increment(1) });
+      }
+      const regRef = db.collection('series').doc(seriesId).collection('registrations').doc(uid);
+      await regRef.set({
+        name, email,
+        registeredAt:  FieldValue.serverTimestamp(),
+        paymentStatus: 'paid',
+        amountPaid:    0,
+      });
+      await db.collection('series').doc(seriesId).update({ memberCount: FieldValue.increment(1) });
+
+      const sessionsSnap = await db.collection('sessions').where('seriesId', '==', seriesId).get();
+      await Promise.all(sessionsSnap.docs.map(async sessionDoc => {
+        const attRef  = sessionDoc.ref.collection('attendees').doc(uid);
+        const existing = await attRef.get();
+        if (existing.exists) return;
+        await db.runTransaction(async t => {
+          t.set(attRef, {
+            name, email,
+            gender: u.gender || null, positions: u.positions || [],
+            present: false, paid: false, feeWaived: true, seriesId,
+            joinedAt: FieldValue.serverTimestamp(),
+          });
+          t.update(sessionDoc.ref, { attendeeCount: FieldValue.increment(1) });
+        });
+      }));
+
+      if (email) {
+        await sendEmail(email, `You're in — ${series.name || 'the series'}`,
+          _emailHtml(`Hi ${name || 'there'},`, [
+            `Your free series pass for <strong>${series.name || 'the series'}</strong> is confirmed.`,
+            `You've been automatically registered for all sessions in this series.`,
+            `If you can't make a specific session, please drop out from the app so someone else can take your spot.`,
+          ]));
+      }
+
+      return res.json({ ok: true });
+    }
+
+    let checkout;
+    try {
+      checkout = await getStripe().checkout.sessions.create({
+        mode: 'payment',
+        billing_address_collection: 'required',
+        line_items: [{
+          price_data: {
+            currency:     'gbp',
+            product_data: { name: series.name || 'Volleyball series' },
+            unit_amount:  Math.round(cost * 100),
+          },
+          quantity: 1,
+        }],
+        customer_email: email || undefined,
+        metadata: { type: 'series', seriesId, uid, inviteToken: inviteToken || '', wasAtCapacity: isFull ? 'true' : 'false' },
+        success_url: successUrl,
+        cancel_url:  cancelUrl,
+      });
+    } catch (e) {
+      console.error('Stripe series checkout error:', e.message);
+      return res.status(500).json({ error: `Payment setup failed: ${e.message}` });
+    }
+
+    return res.json({ url: checkout.url });
+  });
+
 // ── stripeWebhook ───────────────────────────────────────────────────────────
 exports.stripeWebhook = functions
   .region(REGION)
@@ -245,7 +364,13 @@ exports.stripeWebhook = functions
     }
 
     if (event.type === 'checkout.session.completed') {
-      const checkout        = event.data.object;
+      const checkout = event.data.object;
+
+      if (checkout.metadata.type === 'series') {
+        await _handleSeriesCheckout(checkout);
+        return res.json({ received: true });
+      }
+
       const { sessionId, uid, refundAmountPence, positions: positionsMeta } = checkout.metadata;
       const sessionPositions = positionsMeta ? JSON.parse(positionsMeta) : [];
       const paymentIntentId = checkout.payment_intent;
@@ -380,7 +505,7 @@ exports.cancelAttendeeAndRefund = functions
     const attendeeRef = sessionRef.collection('attendees').doc(uid);
     await db.runTransaction(async t => {
       t.delete(attendeeRef);
-      t.update(sessionRef, { attendeeCount: FieldValue.increment(-1) });
+      t.update(sessionRef, { attendeeCount: FieldValue.increment(-1), cancellationCount: FieldValue.increment(1) });
       if (refunded) {
         t.update(sessionRef, {
           refunds: FieldValue.arrayUnion({
@@ -419,6 +544,172 @@ exports.cancelAttendeeAndRefund = functions
 
     return res.json({ refunded });
   });
+
+// ── dropOutSeries — remove user from a single session (series pass stays) ───
+exports.dropOutSeries = functions
+  .region(REGION)
+  .runWith({ secrets: [GMAIL_APP_PASSWORD] })
+  .https.onRequest(async (req, res) => {
+    setCors(res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method !== 'POST')    return res.status(405).end();
+
+    let decoded;
+    try { decoded = await verifyAuth(req); }
+    catch (e) { return res.status(401).json({ error: e.message }); }
+
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ error: 'Missing sessionId.' });
+
+    const uid         = decoded.uid;
+    const db          = getFirestore();
+    const sessionRef  = db.collection('sessions').doc(sessionId);
+    const attendeeRef = sessionRef.collection('attendees').doc(uid);
+
+    const [sessionSnap, attendeeSnap] = await Promise.all([sessionRef.get(), attendeeRef.get()]);
+    if (!sessionSnap.exists)  return res.status(404).json({ error: 'Session not found.' });
+    if (!attendeeSnap.exists) return res.status(404).json({ error: 'Not registered for this session.' });
+
+    const attendee = attendeeSnap.data();
+    if (!attendee.seriesId) return res.status(400).json({ error: 'Not a series registration.' });
+
+    await db.runTransaction(async t => {
+      t.delete(attendeeRef);
+      t.update(sessionRef, { attendeeCount: FieldValue.increment(-1) });
+    });
+
+    const session = sessionSnap.data();
+    const venue   = session.venue || 'the session';
+    const dateStr = _formatDate(session.date);
+    const email   = decoded.email || attendee.email;
+    const name    = attendee.name || 'there';
+
+    if (email) {
+      await sendEmail(email,
+        `Dropped out — ${venue}${dateStr ? ` · ${dateStr}` : ''}`,
+        _emailHtml(`Hi ${name},`, [
+          `You've dropped out of <strong>${venue}</strong>${dateStr ? ` on <strong>${dateStr}</strong>` : ''}.`,
+          `Your series pass is still active for all other sessions in the series.`,
+        ])
+      );
+    }
+
+    await _notifyWaitingList(db, sessionId, session);
+
+    return res.json({ ok: true });
+  });
+
+// ── _handleSeriesCheckout ────────────────────────────────────────────────────
+async function _handleSeriesCheckout(checkout) {
+  const { seriesId, uid, invited } = checkout.metadata;
+  const db = getFirestore();
+
+  const [seriesSnap, userDoc] = await Promise.all([
+    db.collection('series').doc(seriesId).get(),
+    db.collection('users').doc(uid).get(),
+  ]);
+
+  const series = seriesSnap.data() || {};
+  const u      = userDoc.data() || {};
+  const name   = u.name  || checkout.customer_details?.name  || '';
+  const email  = u.email || checkout.customer_details?.email || '';
+
+  // Idempotency: skip if already registered
+  const regRef  = db.collection('series').doc(seriesId).collection('registrations').doc(uid);
+  const existing = await regRef.get();
+  if (existing.exists && existing.data().paymentStatus === 'paid') {
+    console.log(`Series checkout duplicate: uid=${uid} seriesId=${seriesId}`);
+    return;
+  }
+
+  // Bump maxPlayers if this was an invited join to a series that was at capacity when checkout was created
+  if (checkout.metadata.wasAtCapacity === 'true' && checkout.metadata.inviteToken) {
+    const inviteSnap = await db.collection('series').doc(seriesId).collection('invites').doc(checkout.metadata.inviteToken).get();
+    if (inviteSnap.exists) {
+      await db.collection('series').doc(seriesId).update({ maxPlayers: FieldValue.increment(1) });
+    }
+  }
+
+  await regRef.set({
+    name, email,
+    registeredAt:    FieldValue.serverTimestamp(),
+    paymentStatus:   'paid',
+    stripeSessionId: checkout.id,
+    amountPaid:      (checkout.amount_total || 0) / 100,
+  });
+
+  await db.collection('series').doc(seriesId).update({
+    memberCount: FieldValue.increment(1),
+  });
+
+  // Auto-enrol in all sessions with this seriesId
+  const sessionsSnap = await db.collection('sessions').where('seriesId', '==', seriesId).get();
+  await Promise.all(sessionsSnap.docs.map(async sessionDoc => {
+    const attendeeRef = sessionDoc.ref.collection('attendees').doc(uid);
+    const existingAtt = await attendeeRef.get();
+    if (existingAtt.exists) return;
+    await db.runTransaction(async t => {
+      t.set(attendeeRef, {
+        name, email,
+        gender:    u.gender    || null,
+        positions: u.positions || [],
+        present:   false,
+        paid:      true,
+        feeWaived: false,
+        seriesId,
+        joinedAt: FieldValue.serverTimestamp(),
+      });
+      t.update(sessionDoc.ref, { attendeeCount: FieldValue.increment(1) });
+    });
+  }));
+
+  // Confirmation email
+  if (email) {
+    await sendEmail(email,
+      `You\'re in — ${series.name || 'the series'}`,
+      _emailHtml(`Hi ${name || 'there'},`, [
+        `Your series pass for <strong>${series.name || 'the series'}</strong> has been confirmed.`,
+        `You\'ve been automatically registered for all sessions in this series.`,
+        `If you can\'t make a specific session, please drop out from the app so someone else can take your spot.`,
+      ])
+    );
+  }
+}
+
+// ── _autoEnrolSeriesMembers ──────────────────────────────────────────────────
+async function _autoEnrolSeriesMembers(db, sessionId, session) {
+  const regsSnap = await db.collection('series').doc(session.seriesId)
+    .collection('registrations').where('paymentStatus', '==', 'paid').get();
+  if (regsSnap.empty) return;
+
+  const sessionRef = db.collection('sessions').doc(sessionId);
+
+  await Promise.all(regsSnap.docs.map(async regDoc => {
+    const reg      = regDoc.data();
+    const uid      = regDoc.id;
+    const attRef   = sessionRef.collection('attendees').doc(uid);
+    const existing = await attRef.get();
+    if (existing.exists) return;
+
+    const userDoc = await db.collection('users').doc(uid).get();
+    const u = userDoc.exists ? userDoc.data() : {};
+
+    await db.runTransaction(async t => {
+      t.set(attRef, {
+        name:      u.name  || reg.name  || '',
+        email:     u.email || reg.email || '',
+        gender:    u.gender    || null,
+        positions: u.positions || [],
+        present:   false,
+        paid:      true,
+        feeWaived: false,
+        seriesId:  session.seriesId,
+        joinedAt:  FieldValue.serverTimestamp(),
+      });
+      t.update(sessionRef, { attendeeCount: FieldValue.increment(1) });
+    });
+  }));
+}
 
 // ── onSessionCancelled — notify all attendees when admin cancels a session ──
 exports.onSessionCancelled = onDocumentUpdated({
@@ -475,8 +766,9 @@ exports.onAttendeeJoined = onDocumentCreated({
   secrets:   [GMAIL_APP_PASSWORD],
 }, async (event) => {
   const attendee = event.data.data();
-  if (attendee.paid) return; // paid sessions get confirmation from stripeWebhook
-  if (!attendee.email) return;
+  if (attendee.paid)     return; // paid sessions get confirmation from stripeWebhook
+  if (attendee.seriesId) return; // series auto-enrol — confirmation sent by series checkout
+  if (!attendee.email)   return;
 
   const db         = getFirestore();
   const sessionId  = event.params.sessionId;
@@ -564,6 +856,17 @@ exports.removeAttendeeAdmin = functions
     return res.json({ ok: true });
   });
 
+// ── onSessionCreated — auto-enrol series members when a series session is created
+exports.onSessionCreated = onDocumentCreated({
+  document: 'sessions/{sessionId}',
+  region:   REGION_FIRESTORE,
+}, async (event) => {
+  const session = event.data.data();
+  if (!session?.seriesId) return;
+  const db = getFirestore();
+  await _autoEnrolSeriesMembers(db, event.params.sessionId, session);
+});
+
 // ── onSessionUpdated — notify attendees when venue / date / time / cost changes
 exports.onSessionUpdated = onDocumentUpdated({
   document:  'sessions/{sessionId}',
@@ -576,6 +879,11 @@ exports.onSessionUpdated = onDocumentUpdated({
   if (after.status === 'cancelled') return; // handled by onSessionCancelled
 
   const db = getFirestore();
+
+  // Auto-enrol series members when seriesId is first assigned to this session
+  if (!before.seriesId && after.seriesId) {
+    await _autoEnrolSeriesMembers(db, event.params.sessionId, after);
+  }
 
   // ── session just closed → flag coach payment pending and email admins ──
   if (before.status !== 'closed' && after.status === 'closed') {

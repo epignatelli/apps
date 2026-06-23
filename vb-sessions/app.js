@@ -1,3 +1,19 @@
+// ─── Constants ─────────────────────────────────────────────────────────────────
+const SESSION_TYPES = [
+  { value: 'game',       label: 'Game' },
+  { value: 'league',     label: 'League' },
+  { value: 'clinic',     label: 'Clinic' },
+  { value: 'kqotc',     label: 'KQOTC' },
+  { value: 'tournament', label: 'Tournament' },
+  { value: 'tryout',     label: 'Tryout' },
+  { value: 'training',   label: 'Training' },
+];
+const SESSION_GENDERS = [
+  { value: 'mixed', label: 'Mixed' },
+  { value: 'women', label: 'Women' },
+  { value: 'men',   label: 'Men' },
+];
+
 // ─── State ─────────────────────────────────────────────────────────────────────
 let _currentUser  = null;
 let _currentRoles = [];
@@ -18,13 +34,32 @@ let _currentAttendees       = [];     // attendee list for the open session (use
 // We convert this to a hash route immediately so normal routing takes over,
 // and stash the success flag to show a toast after auth resolves.
 let _pendingCheckoutSuccess = null;
-(function _handleStripeReturn() {
-  const p      = new URLSearchParams(window.location.search);
-  const status = p.get('checkout');
-  const sid    = p.get('session');
-  if (!status || !sid) return;
-  history.replaceState(null, '', window.location.pathname + '#session/' + sid);
-  if (status === 'success') _pendingCheckoutSuccess = sid;
+let _seriesInvite           = null; // { seriesId, token } when user arrived via a valid invite link
+(function _handleUrlParams() {
+  const p        = new URLSearchParams(window.location.search);
+  const status   = p.get('checkout');
+  const type     = p.get('type');
+  const sid      = p.get('session');
+  const seriesId = p.get('seriesId');
+  const joinId   = p.get('join');
+  const token    = p.get('token');
+
+  // Invite link: ?join={seriesId}&token={token}
+  if (joinId && token) {
+    _seriesInvite = { seriesId: joinId, token };
+    history.replaceState(null, '', window.location.pathname + '#series/' + joinId);
+    return; // hash routing will handle navigation
+  }
+
+  // Stripe return
+  if (!status) return;
+  if (type === 'series' && seriesId) {
+    history.replaceState(null, '', window.location.pathname + '#series/' + seriesId);
+    if (status === 'success') _pendingCheckoutSuccess = 'series:' + seriesId;
+  } else if (sid) {
+    history.replaceState(null, '', window.location.pathname + '#session/' + sid);
+    if (status === 'success') _pendingCheckoutSuccess = sid;
+  }
 })();
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
@@ -57,8 +92,8 @@ async function callFn(name, body) {
   return data;
 }
 
-function _sessionsRef()           { return getDb().collection('sessions'); }
-function _sessionRef(id)          { return _sessionsRef().doc(id); }
+function _sessionsRef()              { return getDb().collection('sessions'); }
+function _sessionRef(id)             { return _sessionsRef().doc(id); }
 function _attendeesRef(sessionId)    { return _sessionRef(sessionId).collection('attendees'); }
 function _sessionHistoryRef(uid)     { return _userRef(uid).collection('sessions'); }
 function _usersRef()              { return getDb().collection('users'); }
@@ -130,17 +165,26 @@ async function handleAuthClick() {
 }
 
 // ─── Nav helpers ───────────────────────────────────────────────────────────────
-let _backFn            = null;
+let _backFn              = null;
 let _pendingCoachRequest = false;
+let _activeSeriesFilter  = null; // { id, name } or null
+let _activeSeries        = null; // full series doc data when in filtered mode
+let _activeSeriesReg     = null; // user's paid registration for _activeSeries, or null
+let _activeSeriesMembers = []; // paid registrations for current series (admin view)
+let _allSeries           = [];
+let _editingSeriesId     = null;
 
 function _setNav(mode, activeTab) {
   const tabsRow = document.getElementById('nav-tabs-row');
   const backBtn = document.getElementById('nav-back-btn');
   const isPrimary = mode === 'primary';
-  const showTabs  = isPrimary && _isAdmin;
+  const showTabs  = isPrimary && !!_currentUser;
   if (tabsRow) tabsRow.style.display = showTabs ? 'flex' : 'none';
   if (backBtn) backBtn.style.display = isPrimary ? 'none' : '';
   document.documentElement.style.setProperty('--header-h', showTabs ? '95px' : '55px');
+  document.querySelectorAll('.admin-tab').forEach(t => {
+    t.style.display = _isAdmin ? '' : 'none';
+  });
   document.querySelectorAll('.nav-tab').forEach(t =>
     t.classList.toggle('active', !!activeTab && t.dataset.tab === activeTab)
   );
@@ -167,13 +211,16 @@ function _updateAuthUI() {
   }
   const newBtn = document.getElementById('home-new-btn');
   if (newBtn) newBtn.style.display = _isAdmin ? '' : 'none';
-  // Refresh tab strip (e.g. player logged in, then promoted to admin)
+  // Refresh admin-only tabs and tab strip visibility
+  document.querySelectorAll('.admin-tab').forEach(t => {
+    t.style.display = _isAdmin ? '' : 'none';
+  });
+  const seriesFooter = document.getElementById('series-footer');
+  if (seriesFooter) seriesFooter.style.display = _isAdmin ? '' : 'none';
   const tabsRow = document.getElementById('nav-tabs-row');
-  if (tabsRow && tabsRow.style.display !== 'none') {
-    if (!_isAdmin) {
-      tabsRow.style.display = 'none';
-      document.documentElement.style.setProperty('--header-h', '55px');
-    }
+  if (tabsRow && !_currentUser) {
+    tabsRow.style.display = 'none';
+    document.documentElement.style.setProperty('--header-h', '55px');
   }
 }
 
@@ -200,7 +247,11 @@ getAuth().onAuthStateChanged(async user => {
       _initialRouted = true;
       await _routeFromHash();
       if (_pendingCheckoutSuccess) {
-        showToast('Payment confirmed! You\'re in.');
+        if (_pendingCheckoutSuccess.startsWith('series:')) {
+          showToast('Series pass confirmed! You\'re enrolled in all sessions.');
+        } else {
+          showToast('Payment confirmed! You\'re in.');
+        }
         _pendingCheckoutSuccess = null;
       }
     } else renderHome();
@@ -238,7 +289,18 @@ function esc(s) {
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-' + id).classList.add('active');
+  const screen = document.getElementById('screen-' + id);
+  screen.classList.add('active');
+  if (!screen.querySelector('.roots-footer')) {
+    screen.insertAdjacentHTML('beforeend',
+      `<footer class="roots-footer">
+        <a class="roots-footer-link" href="/">Roots</a>
+        <span class="roots-footer-dot">·</span>
+        <span class="roots-footer-link dim">About</span>
+        <span class="roots-footer-dot">·</span>
+        <span class="roots-footer-link dim">Policy</span>
+      </footer>`);
+  }
 }
 
 function _setHash(hash) {
@@ -253,6 +315,7 @@ async function _routeFromHash() {
   if (hash === 'insights')      { if (_isAdmin) openInsightsScreen(); else renderHome(); return; }
   if (hash === 'venues')        { if (_isAdmin) openVenuesScreen();   else renderHome(); return; }
   if (hash === 'admin')         { if (_isAdmin) openAdminScreen();    else renderHome(); return; }
+  if (hash === 'series')        { openSeriesScreen(); return; }
   if (hash === 'coach') {
     if (_currentUser) { openProfileScreen(); }
     else { _pendingCoachRequest = true; goHome(); showToast('Sign in to request coach status'); }
@@ -261,7 +324,18 @@ async function _routeFromHash() {
   const slash   = hash.indexOf('/');
   const section = slash > -1 ? hash.slice(0, slash) : hash;
   const id      = slash > -1 ? hash.slice(slash + 1) : '';
-  if (section === 'profile')         { if (_currentUser) await openProfileScreen(id || undefined); else renderHome(); }
+  if (section === 'pass' && id) {
+    await openSeriesDetail(id).catch(() => openSeriesScreen());
+  }
+  else if (section === 'series' && id) {
+    // Used by invite links — goes directly to filtered session list
+    try {
+      const doc = await _seriesRef(id).get();
+      if (doc.exists) await openSeriesSessions(id, doc.data().name);
+      else openSeriesScreen();
+    } catch(e) { openSeriesScreen(); }
+  }
+  else if (section === 'profile')         { if (_currentUser) await openProfileScreen(id || undefined); else renderHome(); }
   else if (section === 'session' && id)  { await openSession(id); }
   else if (section === 'run'     && id)  { await openSessionRun(id); }
   else if (section === 'end'     && id)  {
@@ -277,6 +351,10 @@ async function _routeFromHash() {
 }
 
 function goHome() {
+  _activeSeriesFilter  = null;
+  _activeSeries        = null;
+  _activeSeriesReg     = null;
+  _activeSeriesMembers = [];
   _setHash('home');
   showScreen('home');
   _setNav('primary', 'home');
@@ -397,10 +475,14 @@ async function renderHome() {
   const container = document.getElementById('home-content');
   container.innerHTML = '<div class="home-empty">Loading…</div>';
   try {
-    const snap     = await _sessionsRef().orderBy('date', 'asc').get();
-    const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const snap = await _sessionsRef().orderBy('date', 'asc').get();
+    let sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (_activeSeriesFilter) {
+      sessions = sessions.filter(s => s.seriesId === _activeSeriesFilter.id);
+    }
     if (!sessions.length) {
-      container.innerHTML = '<div class="home-empty">No sessions yet.</div>';
+      const bannerHtml = _activeSeries ? _renderSeriesBanner(_activeSeries, _activeSeriesReg) : '';
+      container.innerHTML = bannerHtml + `<div class="home-empty">${_activeSeriesFilter ? 'No sessions in this series yet.' : 'No sessions yet.'}</div>`;
       return;
     }
 
@@ -414,7 +496,8 @@ async function renderHome() {
       { label: 'Past',     items: past.reverse() },
     ].filter(g => g.items.length);
 
-    container.innerHTML = groups.map(g => `
+    const bannerHtml = _activeSeries ? _renderSeriesBanner(_activeSeries, _activeSeriesReg) : '';
+    container.innerHTML = bannerHtml + groups.map(g => `
       <div class="session-group">
         <div class="session-group-label">${g.label}</div>
         ${g.items.map(_renderSessionCard).join('')}
@@ -426,6 +509,94 @@ async function renderHome() {
   }
 }
 
+async function copySeriesInviteLink(seriesId) {
+  if (!_currentUser) return;
+  try {
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(18)))
+      .map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 24);
+    await _seriesColRef().doc(seriesId).collection('invites').doc(token).set({
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: _currentUser.uid,
+    });
+    const url = `${window.location.origin}${window.location.pathname}?join=${seriesId}&token=${token}#series/${seriesId}`;
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(url).catch(() => _fallbackCopy(url));
+    } else {
+      _fallbackCopy(url);
+    }
+    showToast('Invite link copied!');
+  } catch(e) {
+    console.error('Failed to generate invite:', e);
+    showToast('Couldn\'t generate invite link.', 'error');
+  }
+}
+function _fallbackCopy(text) {
+  const inp = document.createElement('input');
+  inp.value = text;
+  document.body.appendChild(inp);
+  inp.select();
+  document.execCommand('copy');
+  document.body.removeChild(inp);
+}
+
+function _renderSeriesBanner(series, reg) {
+  const isFull    = series.maxPlayers > 0 && (series.memberCount || 0) >= series.maxPlayers;
+  const cost      = series.cost > 0 ? `£${series.cost}` : 'Free';
+  const memberStr = series.maxPlayers
+    ? `${series.memberCount || 0} / ${series.maxPlayers} members`
+    : series.memberCount ? `${series.memberCount} member${series.memberCount !== 1 ? 's' : ''}` : '';
+  const startStr  = series.startDate ? _formatDate(series.startDate) : '';
+  const endStr    = series.endDate   ? _formatDate(series.endDate)   : '';
+  const dateRange = startStr && endStr ? `${startStr} – ${endStr}` : startStr || endStr || '';
+  const meta      = [cost, isFull ? `${memberStr} · Full` : memberStr, dateRange].filter(Boolean).join(' · ');
+
+  let cta = '';
+  if (reg) {
+    cta = `<span class="session-badge series-pass-badge">Series pass ✓</span>`;
+  } else if (_currentUser && !isFull) {
+    const label = series.cost > 0 ? `Join series — ${cost}` : 'Join series — Free';
+    cta = `<button class="cta-btn series-banner-cta" onclick="joinSeries('${series.id}')">${label}</button>`;
+  } else if (_currentUser && isFull && _seriesInvite?.seriesId === series.id) {
+    const label = series.cost > 0 ? `Join series — ${cost}` : 'Join series — Free';
+    cta = `<button class="cta-btn series-banner-cta" onclick="joinSeries('${series.id}')">${label}</button>
+           <div class="series-invite-note">You were invited — joining will extend the pass by one spot.</div>`;
+  } else if (isFull) {
+    cta = `<span class="session-badge full-badge">Pass full</span>`;
+  }
+
+  const copyBtn = _isAdmin
+    ? `<button class="series-copy-link-btn" onclick="copySeriesInviteLink('${series.id}')">Copy invite link</button>`
+    : '';
+
+  return `<div class="series-banner">
+    ${series.description ? `<div class="series-banner-desc">${esc(series.description)}</div>` : ''}
+    ${meta ? `<div class="series-banner-meta">${meta}</div>` : ''}
+    <div class="series-banner-actions">${cta}${copyBtn}</div>
+  </div>`;
+}
+
+function _renderSeriesMembersSection(members) {
+  if (!members.length) return `<div class="series-members-section"><div class="detail-section-title">Members (0)</div><div class="empty-note">No one has bought a pass yet.</div></div>`;
+  const rows = members.map((m, i) => _isAdmin
+    ? `<div class="attendee-row">
+        <span class="attendee-num">${i + 1}</span>
+        <button class="attendee-name-btn" onclick="openProfileScreen('${m.uid}')">${esc(m.name || m.email || '—')}</button>
+        <span class="attendee-email">${esc(m.email || '')}</span>
+        <span class="att-chip paid-chip">${m.amountPaid > 0 ? `£${m.amountPaid}` : 'Free'}</span>
+        <span class="history-date" style="margin-left:auto;font-size:11px;color:var(--muted)">${_formatDate(m.registeredAt)}</span>
+       </div>`
+    : `<div class="attendee-row">
+        <span class="attendee-num">${i + 1}</span>
+        <button class="attendee-name-btn" onclick="openProfileScreen('${m.uid}')">${esc(m.name || '—')}</button>
+       </div>`
+  ).join('');
+  return `
+    <div class="series-members-section">
+      <div class="detail-section-title">Members (${members.length})</div>
+      <div class="attendee-list">${rows}</div>
+    </div>`;
+}
+
 function _renderSessionCard(s) {
   const statusClass = s.status === 'cancelled' ? 'cancelled' : s.status === 'full' ? 'full' : s.status === 'closed' ? 'closed' : 'open';
   const statusLabel = s.status === 'cancelled' ? 'Cancelled' : s.status === 'full' ? 'Full' : s.status === 'closed' ? 'Closed' : 'Open';
@@ -434,6 +605,8 @@ function _renderSessionCard(s) {
   const costStr     = _formatPlayerPrice(s.cost, s.absorbFee);
   const countStr    = s.attendeeCount != null ? `${s.attendeeCount}/${s.maxPlayers}` : `0/${s.maxPlayers}`;
   const levelLabel  = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[s.level] || '';
+  const typeLabel   = SESSION_TYPES.find(t => t.value === s.type)?.label || '';
+  const genderLabel = SESSION_GENDERS.find(g => g.value === s.gender)?.label || '';
   return `
     <div class="session-card" onclick="openSession('${s.id}')">
       <div class="session-card-main">
@@ -443,7 +616,10 @@ function _renderSessionCard(s) {
       </div>
       <div class="session-card-meta">
         <span class="session-badge ${statusClass}">${statusLabel}</span>
-        ${levelLabel ? `<span class="session-badge level">${esc(levelLabel)}</span>` : ''}
+        ${levelLabel   ? `<span class="session-badge level">${esc(levelLabel)}</span>` : ''}
+        ${typeLabel    ? `<span class="session-badge type-${esc(s.type)}">${esc(typeLabel)}</span>` : ''}
+        ${genderLabel  ? `<span class="session-badge gender-${esc(s.gender)}">${esc(genderLabel)}</span>` : ''}
+        ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
         ${_isAdmin && s.coach && s.coachFee > 0 && s.status === 'closed' ? _coachPayBadge(s) : ''}
         <span class="session-meta-item">👥 ${countStr}</span>
         <span class="session-meta-item">${esc(costStr)}</span>
@@ -502,14 +678,24 @@ async function openSession(id) {
 
     _setTitle([_formatDate(session.date), session.time].filter(Boolean).join(' · '));
 
-    _renderDetail(session, attendees, isAttending, waitingList, myWaitingListPos, content, footer);
+    // Check if user has a series pass for this session's series
+    let seriesReg = null;
+    if (_currentUser && session.seriesId) {
+      try {
+        const regDoc = await _seriesColRef().doc(session.seriesId)
+          .collection('registrations').doc(_currentUser.uid).get();
+        if (regDoc.exists && regDoc.data().paymentStatus === 'paid') seriesReg = regDoc.data();
+      } catch(e) { /* non-critical */ }
+    }
+
+    _renderDetail(session, attendees, isAttending, waitingList, myWaitingListPos, content, footer, seriesReg);
   } catch(e) {
     content.innerHTML = '<div class="home-empty">Couldn\'t load session.</div>';
     console.error(e);
   }
 }
 
-function _renderDetail(session, attendees, isAttending, waitingList, myWaitingListPos, content, footer) {
+function _renderDetail(session, attendees, isAttending, waitingList, myWaitingListPos, content, footer, seriesReg) {
   const knownCount     = _currentUser ? attendees.length : (session.attendeeCount || 0);
   const spotsLeft      = _spotsLeft(session, knownCount);
   const isCancelled    = session.status === 'cancelled';
@@ -575,6 +761,7 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
                 ${genderSym ? `<span class="attendee-gender ${genderClass}">${genderSym}</span>` : ''}
                 <button class="attendee-name-btn" onclick="openProfileScreen('${a.id}')">${esc(a.name)}</button>
                 ${posChips ? `<div class="att-chips">${posChips}</div>` : ''}
+                ${a.seriesId ? `<span class="att-chip series-chip" title="Series pass">S</span>` : ''}
                 ${canSee && session.cost > 0 ? `<span class="att-chip ${a.feeWaived ? 'waived-chip' : a.paid ? 'paid-chip' : 'unpaid-chip'}">${a.feeWaived ? '£–' : a.paid ? '£✓' : '£?'}</span>` : ''}
                 ${_isAdmin ? `<span class="attendee-email">${esc(a.email || '')}</span>` : ''}
                 ${isOwn && session.askPositions ? `<button class="icon-btn small" onclick="openEditPositions('${session.id}','${Array.from(posSet).join(',')}')" title="Edit positions">✎</button>` : ''}
@@ -624,6 +811,12 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
     ? `<button class="cta-btn secondary-btn" onclick="openMessageForm('${session.id}')">✉ Message attendees</button>`
     : '';
 
+  // Series pass: replace cancel with drop-out, replace join with series-pass join
+  const dropOutBtn  = seriesReg ? `<button class="cta-btn secondary-btn" onclick="dropOutOfSession('${session.id}')">Drop out of this session</button>` : '';
+  const seriesJoin  = seriesReg && !isAttending && !isFull && !deadlinePassed
+    ? `<button class="cta-btn" onclick="registerWithSeriesPass('${session.id}')">Join with series pass →</button>`
+    : '';
+
   if (isClosed) {
     const coachPayBtn  = _isAdmin && session.coach && session.coachFee > 0 ? _coachPayCtaBtn(session) : '';
     const exportCsvBtn = _isAdmin
@@ -639,21 +832,27 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
     footer.innerHTML = `<button class="cta-btn" disabled>Session cancelled</button>`;
   } else if (canStart) {
     const joinBtn = !isAttending && !isFull && !deadlinePassed
-      ? _isAdmin && session.cost > 0
-        ? `<button class="cta-btn secondary-btn" onclick="registerFree('${session.id}')">Register free →</button>
-           <button class="cta-btn secondary-btn" onclick="register('${session.id}')">Pay and join →</button>`
-        : `<button class="cta-btn secondary-btn" onclick="register('${session.id}')">Join →</button>`
+      ? seriesJoin || (_isAdmin && session.cost > 0
+          ? `<button class="cta-btn secondary-btn" onclick="registerFree('${session.id}')">Register free →</button>
+             <button class="cta-btn secondary-btn" onclick="register('${session.id}')">Pay and join →</button>`
+          : `<button class="cta-btn secondary-btn" onclick="register('${session.id}')">Join →</button>`)
+      : '';
+    const cancelBtn = isAttending
+      ? seriesReg ? dropOutBtn : `<button class="cta-btn secondary-btn" onclick="cancelRegistration('${session.id}')">${cancelLabel}</button>`
       : '';
     const exportCsvBtn = _isAdmin
       ? `<button class="cta-btn secondary-btn" onclick="exportAttendeesCsv('${session.id}')">⬇ Export attendees</button>`
       : '';
     footer.innerHTML = `
       <button class="cta-btn" onclick="openSessionRun('${session.id}')">▶ Start session</button>
-      ${isAttending ? `<button class="cta-btn secondary-btn" onclick="cancelRegistration('${session.id}')">${cancelLabel}</button>` : joinBtn}
+      ${cancelBtn}${joinBtn}
       ${exportCsvBtn}
       ${msgBtn}`;
   } else if (isAttending) {
-    footer.innerHTML = `<button class="cta-btn secondary-btn" onclick="cancelRegistration('${session.id}')">${cancelLabel}</button>${msgBtn}`;
+    const cancelBtn = seriesReg ? dropOutBtn : `<button class="cta-btn secondary-btn" onclick="cancelRegistration('${session.id}')">${cancelLabel}</button>`;
+    footer.innerHTML = `${cancelBtn}${msgBtn}`;
+  } else if (seriesJoin) {
+    footer.innerHTML = `${seriesJoin}${msgBtn}`;
   } else if (myWaitingListPos !== 0 && !isFull && !deadlinePassed) {
     footer.innerHTML = `<button class="cta-btn" onclick="register('${session.id}')">Claim your spot →</button>${msgBtn}`;
   } else if (myWaitingListPos !== 0) {
@@ -762,6 +961,93 @@ async function _doRegister(sessionId, extra = {}) {
     console.error('Register failed:', e);
     showToast(e.message || 'Couldn\'t join session. Try again.', 'error');
     if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  }
+}
+
+async function joinSeries(seriesId) {
+  const btn = document.querySelector('.series-banner-cta');
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+
+  if (!_currentUser) {
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    await handleAuthClick();
+    return;
+  }
+
+  try {
+    const base = window.location.origin + window.location.pathname;
+    const data = await callFn('createSeriesCheckoutSession', {
+      seriesId,
+      inviteToken: _seriesInvite?.seriesId === seriesId ? _seriesInvite.token : null,
+      successUrl: `${base}?checkout=success&type=series&seriesId=${seriesId}`,
+      cancelUrl:  `${base}?checkout=cancelled&type=series&seriesId=${seriesId}`,
+    });
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      showToast('You\'re in! Series pass activated.');
+      _seriesInvite    = null;
+      _activeSeriesReg = { paymentStatus: 'paid' };
+      renderHome();
+    }
+  } catch(e) {
+    const alreadyHas = e.message && e.message.toLowerCase().includes('already registered');
+    if (alreadyHas) {
+      showToast('You already have a series pass.');
+      _activeSeriesReg = { paymentStatus: 'paid' };
+      renderHome();
+    } else {
+      showToast(e.message || 'Couldn\'t join series. Try again.', 'error');
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    }
+  }
+}
+
+async function registerWithSeriesPass(sessionId) {
+  if (!_currentUser) return;
+  const btn = document.querySelector('#detail-footer .cta-btn');
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+  try {
+    const [userDoc, sessionDoc] = await Promise.all([
+      _userRef(_currentUser.uid).get(),
+      _sessionRef(sessionId).get(),
+    ]);
+    const u       = userDoc.data()  || {};
+    const session = sessionDoc.data() || {};
+    await _attendeesRef(sessionId).doc(_currentUser.uid).set({
+      name:      u.name  || _currentUser.displayName || '',
+      email:     u.email || _currentUser.email       || '',
+      gender:    u.gender    || null,
+      positions: u.positions || [],
+      present:   false,
+      paid:      true,
+      feeWaived: false,
+      seriesId:  session.seriesId,
+      joinedAt:  firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await _sessionRef(sessionId).update({
+      attendeeCount: firebase.firestore.FieldValue.increment(1),
+    });
+    showToast('You\'re in!');
+    await openSession(sessionId);
+  } catch(e) {
+    showToast(e.message || 'Couldn\'t join session.', 'error');
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  }
+}
+
+async function dropOutOfSession(sessionId) {
+  if (!_currentUser) return;
+  if (!confirm('Drop out of this session? Your series pass stays active for all other sessions.')) return;
+  const btns = document.querySelectorAll('#detail-footer button');
+  btns.forEach(b => { b.disabled = true; });
+  try {
+    await callFn('dropOutSeries', { sessionId });
+    showToast('Dropped out. Your series pass is still active.');
+    await openSession(sessionId);
+  } catch(e) {
+    showToast(e.message || 'Couldn\'t drop out. Try again.', 'error');
+    btns.forEach(b => { b.disabled = false; });
   }
 }
 
@@ -1120,28 +1406,99 @@ async function openProfileScreen(uid) {
         <button class="cta-btn secondary-btn" onclick="handleAuthClick()" style="margin-top:8px">Sign out</button>
       </div>` : '';
 
-    // Fetch session history and (for coaches) payment history in parallel
-    const [historySnap, coachSessionsSnap] = await Promise.all([
-      (isOwn || _isAdmin)
-        ? _sessionHistoryRef(targetUid).orderBy('date', 'desc').limit(25).get().catch(e => { console.warn('History query failed:', e); return null; })
+    const showHistory = isOwn || _isAdmin;
+    const showCoach   = (hasCoach || roles.includes('admin') || roles.includes('owner')) && _isAdmin;
+
+    // Fetch all data in parallel: coach sessions, all series docs, all session docs
+    const [coachSessionsSnap, allSeriesSnap, allSessionsSnap] = await Promise.all([
+      showCoach
+        ? _sessionsRef().where('coachUid', '==', targetUid).where('status', '==', 'closed').orderBy('date', 'desc').limit(25).get().catch(() => null)
         : Promise.resolve(null),
-      (hasCoach || roles.includes('admin') || roles.includes('owner')) && _isAdmin
-        ? _sessionsRef().where('coachUid', '==', targetUid).where('status', '==', 'closed').orderBy('date', 'desc').limit(25).get().catch(e => { console.warn('Coach sessions query failed:', e); return null; })
+      showHistory
+        ? _seriesColRef().orderBy('name').get().catch(() => null)
+        : Promise.resolve(null),
+      showHistory
+        ? _sessionsRef().orderBy('date', 'asc').get().catch(() => null)
         : Promise.resolve(null),
     ]);
 
-    const historyRows = historySnap?.docs.length
-      ? historySnap.docs.map(d => {
-          const h = d.data();
-          const cost = h.feeWaived ? '£– (free)' : h.cost > 0 ? `£${h.cost}` : 'Free';
-          return `<div class="history-row">
-            <span class="history-date">${_formatDate(h.date)}</span>
-            <span class="history-venue">${esc(h.venue || '—')}</span>
-            <span class="history-cost">${cost}</span>
-          </div>`;
-        }).join('')
-      : '<div class="empty-note">No session history yet.</div>';
+    const allSeries   = allSeriesSnap?.docs.map(d => ({ id: d.id, ...d.data() }))   || [];
+    const allSessions = allSessionsSnap?.docs.map(d => ({ id: d.id, ...d.data() })) || [];
 
+    // Check user's registration for each series and attendance for each session — parallel
+    const [seriesRegSnaps, sessionAttSnaps] = await Promise.all([
+      allSeries.length
+        ? Promise.all(allSeries.map(s =>
+            _seriesColRef().doc(s.id).collection('registrations').doc(targetUid).get().catch(() => null)
+          ))
+        : Promise.resolve([]),
+      allSessions.length
+        ? Promise.all(allSessions.map(s =>
+            _attendeesRef(s.id).doc(targetUid).get().catch(() => null)
+          ))
+        : Promise.resolve([]),
+    ]);
+
+    // ── Series passes ────────────────────────────────────────────────────────
+    const myPasses = allSeries
+      .map((s, i) => ({ s, reg: seriesRegSnaps[i] }))
+      .filter(({ reg }) => reg?.exists && reg.data().paymentStatus === 'paid');
+
+    const seriesPassSection = showHistory ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Series passes</div>
+        <div class="profile-history-list">
+          ${myPasses.length ? myPasses.map(({ s, reg }) => {
+              const r = reg.data();
+              const cost = r.amountPaid > 0 ? `£${r.amountPaid}` : 'Free';
+              return `<div class="history-row clickable-row" onclick="openSeriesDetail('${s.id}')">
+                <span class="history-date">${_formatDate(r.registeredAt)}</span>
+                <span class="history-venue">${esc(s.name)}</span>
+                <span class="history-cost">${cost}</span>
+              </div>`;
+            }).join('')
+            : '<div class="empty-note">No series passes yet.</div>'
+          }
+        </div>
+      </div>` : '';
+
+    // ── Sessions (upcoming + past) ────────────────────────────────────────────
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const mySessionEntries = allSessions
+      .map((s, i) => ({ s, att: sessionAttSnaps[i] }))
+      .filter(({ att }) => att?.exists);
+
+    const upcoming = mySessionEntries.filter(({ s }) => s.date?.toDate() >= now);
+    const past     = mySessionEntries.filter(({ s }) => s.date?.toDate() < now).reverse();
+
+    const _sessionRow = ({ s, att }) => {
+      const a = att.data();
+      const costStr = a.seriesId ? 'Series pass'
+                    : a.feeWaived ? 'Free (waived)'
+                    : a.paid && s.cost > 0 ? `£${_formatPlayerPrice(s.cost, s.absorbFee)}`
+                    : 'Free';
+      return `<div class="history-row clickable-row" onclick="openSession('${s.id}')">
+        <span class="history-date">${_formatDate(s.date)}${s.time ? ` · ${s.time}` : ''}</span>
+        <span class="history-venue">${esc(s.venue || '—')}</span>
+        <span class="history-cost">${costStr}</span>
+      </div>`;
+    };
+
+    const sessionsSection = showHistory ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Upcoming sessions</div>
+        <div class="profile-history-list">
+          ${upcoming.length ? upcoming.map(_sessionRow).join('') : '<div class="empty-note">No upcoming sessions.</div>'}
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">Past sessions</div>
+        <div class="profile-history-list">
+          ${past.length ? past.map(_sessionRow).join('') : '<div class="empty-note">No past sessions yet.</div>'}
+        </div>
+      </div>` : '';
+
+    // ── Coach payments ────────────────────────────────────────────────────────
     const coachPayRows = coachSessionsSnap?.docs.length
       ? coachSessionsSnap.docs.map(d => {
           const s      = d.data();
@@ -1158,12 +1515,6 @@ async function openProfileScreen(uid) {
           </div>`;
         }).join('')
       : null;
-
-    const historySection = (isOwn || _isAdmin) ? `
-      <div class="detail-section">
-        <div class="detail-section-title">Session history</div>
-        <div class="profile-history-list">${historyRows}</div>
-      </div>` : '';
 
     const coachPaySection = coachPayRows != null ? `
       <div class="detail-section">
@@ -1183,7 +1534,8 @@ async function openProfileScreen(uid) {
         ${metaRows ? `<div class="detail-section"><div class="detail-meta-grid">${metaRows}</div></div>` : ''}
         ${ownActions}
         ${coachPaySection}
-        ${historySection}
+        ${seriesPassSection}
+        ${sessionsSection}
       </div>`;
   } catch(e) {
     console.error('Load profile failed:', e);
@@ -1329,6 +1681,16 @@ function openSessionForm(id = null) {
   const errorEl  = document.getElementById('form-error');
   errorEl.textContent = '';
 
+  // Recurrence only applies to new sessions
+  document.getElementById('form-repeat-row').style.display     = id ? 'none' : '';
+  document.getElementById('form-repeat-end-row').style.display = 'none';
+  document.getElementById('form-repeat').value                 = '';
+  document.getElementById('form-repeat-end-type').value        = 'count';
+  document.getElementById('form-repeat-count').value           = '4';
+  document.getElementById('form-repeat-until').value           = '';
+  document.getElementById('form-repeat-count-wrap').style.display = '';
+  document.getElementById('form-repeat-date-wrap').style.display  = 'none';
+
   if (id) {
     titleEl.textContent  = 'Edit session';
     submitEl.textContent = 'Save changes';
@@ -1355,7 +1717,10 @@ function openSessionForm(id = null) {
       statusSel.value = s.status || 'open';
       document.getElementById('form-ask-positions').checked = s.askPositions || false;
       document.getElementById('form-absorb-fee').checked   = s.absorbFee    || false;
+      document.getElementById('form-type').value   = s.type   || 'game';
+      document.getElementById('form-gender').value = s.gender || 'mixed';
       await _populateVenueSelect(s.venueId || '');
+      await _populateSeriesSelect(s.seriesId || '');
       updateCostPreview();
     });
   } else {
@@ -1365,6 +1730,8 @@ function openSessionForm(id = null) {
     document.getElementById('form-date').value        = now.toISOString().slice(0, 10);
     document.getElementById('form-time').value        = '10:00';
     document.getElementById('form-level').value       = '';
+    document.getElementById('form-type').value        = 'game';
+    document.getElementById('form-gender').value      = 'mixed';
     _loadCoachOptions('');
     document.getElementById('form-description').value = '';
     document.getElementById('form-max').value         = '12';
@@ -1377,10 +1744,35 @@ function openSessionForm(id = null) {
     document.getElementById('form-ask-positions').checked = false;
     document.getElementById('form-absorb-fee').checked   = false;
     _populateVenueSelect('');
+    _populateSeriesSelect(_activeSeriesFilter?.id || '');
     updateCostPreview();
   }
 
   document.getElementById('session-form-overlay').classList.add('open');
+}
+
+function onRepeatChange() {
+  const repeat = document.getElementById('form-repeat').value;
+  document.getElementById('form-repeat-end-row').style.display = repeat ? '' : 'none';
+}
+function onRepeatEndTypeChange() {
+  const type = document.getElementById('form-repeat-end-type').value;
+  document.getElementById('form-repeat-count-wrap').style.display = type === 'count' ? '' : 'none';
+  document.getElementById('form-repeat-date-wrap').style.display  = type === 'date'  ? '' : 'none';
+}
+function _expandDates(startDateStr, repeat, endType, endCount, endDateStr) {
+  const dates = [];
+  const d     = new Date(startDateStr + 'T12:00:00');
+  const until = endType === 'date' && endDateStr ? new Date(endDateStr + 'T23:59:59') : null;
+  const max   = endType === 'count' ? Math.min(endCount, 52) : 52;
+  while (dates.length < max) {
+    if (until && d > until) break;
+    dates.push(new Date(d));
+    if (repeat === 'weekly')   d.setDate(d.getDate() + 7);
+    else if (repeat === 'biweekly') d.setDate(d.getDate() + 14);
+    else if (repeat === 'monthly')  d.setMonth(d.getMonth() + 1);
+  }
+  return dates;
 }
 
 function updateCostPreview() {
@@ -1419,10 +1811,16 @@ async function submitSessionForm() {
   const descVal     = document.getElementById('form-description').value.trim();
   const maxVal      = parseInt(document.getElementById('form-max').value);
   const costVal     = parseFloat(document.getElementById('form-cost').value) || 0;
-  const coachFeeVal = parseFloat(document.getElementById('form-coach-fee').value) ?? 50;
-  const deadlineVal = document.getElementById('form-deadline').value;
-  const status      = document.getElementById('form-status').value;
-  const errorEl     = document.getElementById('form-error');
+  const coachFeeVal  = parseFloat(document.getElementById('form-coach-fee').value) ?? 50;
+  const deadlineVal  = document.getElementById('form-deadline').value;
+  const status       = document.getElementById('form-status').value;
+  const typeVal      = document.getElementById('form-type').value;
+  const genderVal    = document.getElementById('form-gender').value;
+  const seriesSelEl  = document.getElementById('form-series-select');
+  const seriesIdVal  = seriesSelEl?.value || '';
+  const seriesObj    = _allSeries.find(s => s.id === seriesIdVal);
+  const seriesNameVal = seriesObj?.name || '';
+  const errorEl      = document.getElementById('form-error');
 
   if (!dateVal)                    { errorEl.textContent = 'Please set a date.'; return; }
   if (!venueId)                    { errorEl.textContent = 'Please select a venue.'; return; }
@@ -1447,19 +1845,51 @@ async function submitSessionForm() {
     absorbFee:            document.getElementById('form-absorb-fee').checked,
     playerPrice:          document.getElementById('form-absorb-fee').checked ? costVal : _playerPrice(costVal),
     askPositions:         document.getElementById('form-ask-positions').checked,
+    type:                 typeVal,
+    gender:               genderVal,
+    seriesId:             seriesIdVal || null,
+    seriesName:           seriesNameVal,
     registrationDeadline: deadlineVal
       ? firebase.firestore.Timestamp.fromDate(new Date(deadlineVal))
       : null,
     status,
   };
 
+  const repeat    = !_editingId ? (document.getElementById('form-repeat').value || '') : '';
+  const endType   = document.getElementById('form-repeat-end-type').value || 'count';
+  const endCount  = parseInt(document.getElementById('form-repeat-count').value) || 4;
+  const endDateStr = document.getElementById('form-repeat-until').value || '';
+
+  const dates = repeat
+    ? _expandDates(dateVal, repeat, endType, endCount, endDateStr)
+    : [new Date(dateVal + 'T12:00:00')];
+
+  if (!repeat && dates.length === 0) {
+    errorEl.textContent = 'Invalid repeat configuration.';
+    btn.disabled = false;
+    return;
+  }
+
   try {
     if (_editingId) {
       await _sessionRef(_editingId).update(data);
-    } else {
+    } else if (dates.length === 1) {
       data.createdAt     = firebase.firestore.FieldValue.serverTimestamp();
       data.attendeeCount = 0;
       await _sessionsRef().add(data);
+    } else {
+      const batch = firebase.firestore().batch();
+      dates.forEach(d => {
+        const ref = _sessionsRef().doc();
+        batch.set(ref, {
+          ...data,
+          date:          firebase.firestore.Timestamp.fromDate(d),
+          createdAt:     firebase.firestore.FieldValue.serverTimestamp(),
+          attendeeCount: 0,
+        });
+      });
+      await batch.commit();
+      showToast(`${dates.length} sessions created.`);
     }
     closeSessionForm();
     renderHome();
@@ -2770,6 +3200,353 @@ async function _populateVenueSelect(selectedId) {
 
 function onVenueSelectChange() {
   // venueId and name resolved at form submit time — nothing extra needed here
+}
+
+// ─── Series ────────────────────────────────────────────────────────────────────
+
+function _seriesRef(id) { return id ? getDb().collection('series').doc(id) : null; }
+function _seriesColRef() { return getDb().collection('series'); }
+
+async function _loadSeries() {
+  const snap  = await _seriesColRef().orderBy('name').get();
+  _allSeries  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return _allSeries;
+}
+
+function openSeriesScreen() {
+  _setHash('series');
+  showScreen('series');
+  _setNav('primary', 'series');
+  _setTitle('');
+  const footer = document.getElementById('series-footer');
+  if (footer) footer.style.display = _isAdmin ? '' : 'none';
+  renderSeries();
+}
+
+async function renderSeries() {
+  const list = document.getElementById('series-list');
+  list.innerHTML = '<div class="home-empty">Loading…</div>';
+  try {
+    await _loadSeries();
+    if (!_allSeries.length) {
+      list.innerHTML = '<div class="home-empty">No series yet.' + (_isAdmin ? ' Add one below.' : '') + '</div>';
+      return;
+    }
+    // Load all user registrations in one batch so cards can show join/pass status
+    let myRegs = {};
+    if (_currentUser) {
+      try {
+        const regSnaps = await Promise.all(
+          _allSeries.map(s => _seriesColRef().doc(s.id).collection('registrations').doc(_currentUser.uid).get())
+        );
+        regSnaps.forEach((snap, i) => {
+          if (snap.exists && snap.data().paymentStatus === 'paid') myRegs[_allSeries[i].id] = true;
+        });
+      } catch(e) { /* non-critical */ }
+    }
+    list.innerHTML = _allSeries.map(s => _renderSeriesCard(s, myRegs[s.id] || false)).join('');
+  } catch(e) {
+    list.innerHTML = '<div class="home-empty">Couldn\'t load series.</div>';
+    console.error(e);
+  }
+}
+
+function _renderSeriesCard(s, hasPass = false) {
+  const startStr  = s.startDate ? _formatDate(s.startDate) : '';
+  const endStr    = s.endDate   ? _formatDate(s.endDate)   : '';
+  const dateRange = startStr && endStr ? `${startStr} – ${endStr}` : startStr || endStr || '';
+  const costStr   = s.cost > 0 ? `£${s.cost}` : 'Free';
+  const isFull    = s.maxPlayers > 0 && (s.memberCount || 0) >= s.maxPlayers;
+  const members   = s.maxPlayers
+    ? `${s.memberCount || 0}/${s.maxPlayers}${isFull ? ' · Full' : ''}`
+    : s.memberCount ? `${s.memberCount} member${s.memberCount !== 1 ? 's' : ''}` : '';
+  const meta = [costStr, members, dateRange].filter(Boolean).join(' · ');
+
+  const joinBtn = !_isAdmin && _currentUser && !hasPass && !isFull
+    ? `<button class="cta-btn series-card-join" onclick="event.stopPropagation(); _joinSeriesFromCard('${s.id}', this)">${s.cost > 0 ? `Buy pass — ${costStr}` : 'Join — Free'}</button>`
+    : '';
+  const passBadge = !_isAdmin && hasPass
+    ? `<span class="session-badge series-pass-badge">Pass ✓</span>`
+    : '';
+  const fullBadge = !_isAdmin && !hasPass && isFull
+    ? `<span class="session-badge full-badge">Full</span>`
+    : '';
+
+  return `
+    <div class="series-card" onclick="openSeriesDetail('${s.id}')">
+      <div class="series-card-main">
+        <div class="series-card-name">${esc(s.name)}</div>
+        ${s.description ? `<div class="series-card-meta">${esc(s.description)}</div>` : ''}
+        ${meta ? `<div class="series-card-meta">${meta}</div>` : ''}
+        ${joinBtn}${passBadge}${fullBadge}
+      </div>
+      ${_isAdmin ? `
+        <div class="session-admin-btns" onclick="event.stopPropagation()">
+          <button class="icon-btn" onclick="openSeriesForm('${s.id}')" title="Edit">✎</button>
+          <button class="icon-btn" onclick="copySeriesInviteLink('${s.id}')" title="Copy invite link">🔗</button>
+        </div>` : ''}
+    </div>`;
+}
+
+async function _joinSeriesFromCard(seriesId, btn) {
+  // Disable immediately so the user gets instant feedback
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+
+  if (!_currentUser) {
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    await handleAuthClick();
+    return;
+  }
+
+  try {
+    const base = window.location.origin + window.location.pathname;
+    const data = await callFn('createSeriesCheckoutSession', {
+      seriesId,
+      inviteToken: _seriesInvite?.seriesId === seriesId ? _seriesInvite.token : null,
+      successUrl: `${base}?checkout=success&type=series&seriesId=${seriesId}`,
+      cancelUrl:  `${base}?checkout=cancelled&type=series&seriesId=${seriesId}`,
+    });
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      showToast('You\'re in! Series pass activated.');
+      _seriesInvite = null;
+      renderSeries();
+    }
+  } catch(e) {
+    const alreadyHas = e.message && e.message.toLowerCase().includes('already registered');
+    if (alreadyHas) {
+      showToast('You already have a series pass.');
+      renderSeries();
+    } else {
+      showToast(e.message || 'Couldn\'t join series. Try again.', 'error');
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    }
+  }
+}
+
+async function openSeriesDetail(seriesId) {
+  _setHash('pass/' + seriesId);
+  showScreen('detail');
+  _setNav('sub', null);
+  _setTitle('Pass');
+  _setBack(() => openSeriesScreen());
+  document.getElementById('detail-content').innerHTML = '<div class="home-empty">Loading…</div>';
+
+  try {
+    const [seriesSnap, regSnap] = await Promise.all([
+      _seriesColRef().doc(seriesId).get(),
+      _currentUser ? _seriesColRef().doc(seriesId).collection('registrations').doc(_currentUser.uid).get().catch(() => null) : Promise.resolve(null),
+    ]);
+
+    if (!seriesSnap.exists) {
+      document.getElementById('detail-content').innerHTML = '<div class="home-empty">Pass not found.</div>';
+      return;
+    }
+
+    const series = { id: seriesSnap.id, ...seriesSnap.data() };
+    const reg    = regSnap?.exists && regSnap.data().paymentStatus === 'paid' ? regSnap.data() : null;
+
+    // Load members (everyone can see names, admins see full info)
+    let members = [];
+    if (_currentUser) {
+      try {
+        const membersSnap = await _seriesColRef().doc(seriesId).collection('registrations').where('paymentStatus', '==', 'paid').get();
+        members = membersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      } catch(e) { /* non-critical */ }
+    }
+
+    const isFull    = series.maxPlayers > 0 && (series.memberCount || 0) >= series.maxPlayers;
+    const cost      = series.cost > 0 ? `£${series.cost}` : 'Free';
+    const memberStr = series.maxPlayers
+      ? `${series.memberCount || 0} / ${series.maxPlayers} members`
+      : `${series.memberCount || 0} member${(series.memberCount || 0) !== 1 ? 's' : ''}`;
+    const startStr  = series.startDate ? _formatDate(series.startDate) : '';
+    const endStr    = series.endDate   ? _formatDate(series.endDate)   : '';
+    const dateRange = startStr && endStr ? `${startStr} – ${endStr}` : startStr || endStr || '';
+
+    let cta = '';
+    if (reg) {
+      cta = `<span class="session-badge series-pass-badge" style="font-size:14px;padding:6px 12px">Series pass ✓</span>`;
+    } else if (_currentUser && (!isFull || _seriesInvite?.seriesId === seriesId)) {
+      const label = series.cost > 0 ? `Buy pass — ${cost}` : 'Join — Free';
+      cta = `<button class="cta-btn" style="margin-top:4px" onclick="joinSeries('${seriesId}')">${label}</button>`;
+      if (isFull) cta += `<div class="series-invite-note">You were invited — joining will add one spot.</div>`;
+    } else if (isFull) {
+      cta = `<span class="session-badge full-badge" style="font-size:14px;padding:6px 12px">Pass full</span>`;
+    }
+
+    const adminActions = _isAdmin ? `
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="series-copy-link-btn" onclick="copySeriesInviteLink('${seriesId}')">Copy invite link</button>
+        <button class="series-copy-link-btn" onclick="openSeriesForm('${seriesId}')">Edit pass</button>
+      </div>` : '';
+
+    const memberRows = members.map((m, i) => _isAdmin
+      ? `<div class="attendee-row">
+          <span class="attendee-num">${i + 1}</span>
+          <button class="attendee-name-btn" onclick="openProfileScreen('${m.uid}')">${esc(m.name || m.email || '—')}</button>
+          <span class="attendee-email">${esc(m.email || '')}</span>
+          <span class="att-chip paid-chip">${m.amountPaid > 0 ? `£${m.amountPaid}` : 'Free'}</span>
+          <span class="history-date" style="margin-left:auto;font-size:11px;color:var(--muted)">${_formatDate(m.registeredAt)}</span>
+         </div>`
+      : `<div class="attendee-row">
+          <span class="attendee-num">${i + 1}</span>
+          <button class="attendee-name-btn" onclick="openProfileScreen('${m.uid}')">${esc(m.name || '—')}</button>
+         </div>`
+    ).join('');
+
+    document.getElementById('detail-content').innerHTML = `
+      <div class="detail-section">
+        <div class="detail-title">${esc(series.name)}</div>
+        ${series.description ? `<div class="detail-desc">${esc(series.description)}</div>` : ''}
+        <div class="detail-meta-grid" style="margin-top:10px">
+          <div class="detail-meta-row"><span class="detail-meta-label">Cost</span><span>${cost}</span></div>
+          <div class="detail-meta-row"><span class="detail-meta-label">Members</span><span>${memberStr}${isFull ? ' · Full' : ''}</span></div>
+          ${dateRange ? `<div class="detail-meta-row"><span class="detail-meta-label">Dates</span><span>${dateRange}</span></div>` : ''}
+        </div>
+        ${cta}
+        ${adminActions}
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">Members (${members.length})</div>
+        <div class="attendee-list">
+          ${memberRows || '<div class="empty-note">No members yet.</div>'}
+        </div>
+      </div>
+      <div class="detail-section">
+        <button class="cta-btn secondary-btn" onclick="openSeriesSessions('${esc(seriesId)}', '${esc(series.name)}')">View sessions →</button>
+      </div>`;
+  } catch(e) {
+    console.error('Load series detail failed:', e);
+    document.getElementById('detail-content').innerHTML = '<div class="home-empty">Couldn\'t load pass.</div>';
+  }
+}
+
+async function openSeriesSessions(seriesId, seriesName) {
+  _activeSeriesFilter  = { id: seriesId, name: seriesName };
+  _activeSeries        = null;
+  _activeSeriesReg     = null;
+  _activeSeriesMembers = [];
+  _setHash('series/' + seriesId);
+  showScreen('home');
+  _setNav('sub', null);
+  _setTitle(seriesName);
+  _setBack(() => { _activeSeriesFilter = null; _activeSeries = null; _activeSeriesReg = null; _activeSeriesMembers = []; openSeriesDetail(seriesId); });
+  document.getElementById('home-content').innerHTML = '<div class="home-empty">Loading…</div>';
+
+  // Series doc is critical for the banner — fetch separately so a reg/member failure can't hide it
+  try {
+    const seriesDoc = await _seriesColRef().doc(seriesId).get();
+    if (seriesDoc.exists) _activeSeries = { id: seriesDoc.id, ...seriesDoc.data() };
+  } catch(e) { console.error('Failed to load series:', e); }
+
+  // Load user registration + member list in parallel (both non-critical)
+  await Promise.all([
+    _currentUser ? (async () => {
+      try {
+        const regDoc = await _seriesColRef().doc(seriesId).collection('registrations').doc(_currentUser.uid).get();
+        if (regDoc.exists && regDoc.data().paymentStatus === 'paid') _activeSeriesReg = regDoc.data();
+      } catch(e) { /* rules may not be deployed yet */ }
+    })() : Promise.resolve(),
+    _currentUser ? (async () => {
+      try {
+        const membersSnap = await _seriesColRef().doc(seriesId).collection('registrations').where('paymentStatus', '==', 'paid').get();
+        _activeSeriesMembers = membersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      } catch(e) { /* non-critical */ }
+    })() : Promise.resolve(),
+  ]);
+
+  renderHome();
+}
+
+// ── Series form ──
+
+function openSeriesForm(id) {
+  if (!_isAdmin) return;
+  _editingSeriesId = id || null;
+  const s = id ? _allSeries.find(x => x.id === id) : null;
+  document.getElementById('series-form-title').textContent = s ? 'Edit series' : 'New series';
+  document.getElementById('sf-name').value        = s?.name        || '';
+  document.getElementById('sf-description').value = s?.description || '';
+  const startD = s?.startDate?.toDate?.();
+  const endD   = s?.endDate?.toDate?.();
+  document.getElementById('sf-start').value      = startD ? startD.toISOString().slice(0, 10) : '';
+  document.getElementById('sf-end').value        = endD   ? endD.toISOString().slice(0, 10)   : '';
+  document.getElementById('sf-cost').value       = s?.cost       ?? '';
+  document.getElementById('sf-max-players').value = s?.maxPlayers ?? '';
+  document.getElementById('series-form-error').textContent = '';
+  document.getElementById('series-delete-btn').style.display = s ? '' : 'none';
+  document.getElementById('series-form-overlay').classList.add('open');
+}
+
+function closeSeriesForm() {
+  document.getElementById('series-form-overlay').classList.remove('open');
+  _editingSeriesId = null;
+}
+
+async function submitSeriesForm() {
+  const name    = document.getElementById('sf-name').value.trim();
+  const errorEl = document.getElementById('series-form-error');
+  if (!name) { errorEl.textContent = 'Name is required.'; return; }
+
+  const btn  = document.getElementById('series-submit-btn');
+  btn.disabled = true;
+
+  const startVal     = document.getElementById('sf-start').value;
+  const endVal       = document.getElementById('sf-end').value;
+  const costRaw      = parseFloat(document.getElementById('sf-cost').value);
+  const maxPlayersRaw = parseInt(document.getElementById('sf-max-players').value, 10);
+  const data = {
+    name,
+    description: document.getElementById('sf-description').value.trim(),
+    startDate:   startVal ? firebase.firestore.Timestamp.fromDate(new Date(startVal + 'T12:00:00')) : null,
+    endDate:     endVal   ? firebase.firestore.Timestamp.fromDate(new Date(endVal   + 'T12:00:00')) : null,
+    cost:        isNaN(costRaw)       ? 0    : costRaw,
+    maxPlayers:  isNaN(maxPlayersRaw) ? null : maxPlayersRaw,
+  };
+
+  try {
+    if (_editingSeriesId) {
+      await _seriesColRef().doc(_editingSeriesId).update(data);
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await _seriesColRef().add(data);
+    }
+    closeSeriesForm();
+    await renderSeries();
+    await _populateSeriesSelect();
+  } catch(e) {
+    errorEl.textContent = 'Couldn\'t save series. Try again.';
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteSeries() {
+  if (!_editingSeriesId) return;
+  if (!confirm('Delete this series? Sessions assigned to it will keep the association until updated.')) return;
+  try {
+    await _seriesColRef().doc(_editingSeriesId).delete();
+    closeSeriesForm();
+    await _loadSeries();
+    await renderSeries();
+    await _populateSeriesSelect();
+  } catch(e) {
+    document.getElementById('series-form-error').textContent = 'Couldn\'t delete series.';
+  }
+}
+
+async function _populateSeriesSelect(selectedId) {
+  const sel = document.getElementById('form-series-select');
+  if (!sel) return;
+  if (!_allSeries.length) await _loadSeries();
+  const current = selectedId !== undefined ? selectedId : sel.value;
+  sel.innerHTML = '<option value="">None</option>' +
+    _allSeries.map(s =>
+      `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${esc(s.name)}</option>`
+    ).join('');
 }
 
 // ─── Service worker ────────────────────────────────────────────────────────────

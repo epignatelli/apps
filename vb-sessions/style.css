@@ -70,12 +70,14 @@ body {
 
 .nav-tabs-row {
   display: flex; border-top: 1px solid var(--border); height: 40px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
+.nav-tabs-row::-webkit-scrollbar { display: none; }
 .nav-tab {
-  flex: 1; background: none; border: none; border-bottom: 2px solid transparent;
+  flex: none; min-width: 72px; background: none; border: none; border-bottom: 2px solid transparent;
   cursor: pointer; font-family: var(--sport); font-size: 12px; font-weight: 700;
   letter-spacing: .08em; text-transform: uppercase;
-  color: var(--muted); transition: color .15s, border-color .15s; padding: 0;
+  color: var(--muted); transition: color .15s, border-color .15s; padding: 0 14px;
 }
 .nav-tab.active { color: var(--text); border-bottom-color: var(--amber); }
 
@@ -840,4 +842,101 @@ body {
 .venue-address { font-size: 11px; color: var(--muted); margin-left: 6px; }
 .venue-maps-link { font-size: 11px; color: var(--amber); margin-left: 6px; text-decoration: none; }
 .venue-maps-link:hover { text-decoration: underline; }
+
+/* ─── Session type badges ─────────────────────────────────────────────── */
+.session-badge.type-game       { background: var(--surface2);              color: var(--muted);  }
+.session-badge.type-clinic     { background: rgba(96,165,250,.13);         color: #93c5fd;       }
+.session-badge.type-kqotc      { background: var(--amber-bg);              color: var(--amber);  }
+.session-badge.type-tournament { background: var(--green-bg);              color: var(--green);  }
+.session-badge.type-tryout     { background: rgba(251,146,60,.13);         color: #fb923c;       }
+.session-badge.type-training   { background: var(--purple-bg);             color: var(--purple); }
+
+/* ─── Session gender badges ───────────────────────────────────────────── */
+.session-badge.gender-mixed { background: var(--surface2);  color: var(--muted);  }
+.session-badge.gender-women { background: var(--green-bg);  color: var(--green);  }
+.session-badge.gender-men   { background: var(--purple-bg); color: var(--purple); }
+
+/* ─── Series ref badge (on session card) ─────────────────────────────── */
+.session-badge.series-ref { background: rgba(167,139,250,.1); color: var(--purple); }
+
+/* ─── Series cards ────────────────────────────────────────────────────── */
+.series-card {
+  background: rgba(167,139,250,0.05);
+  border: 1px solid rgba(167,139,250,0.2);
+  border-left: 3px solid var(--purple);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color .15s;
+}
+.series-card:active { border-left-color: var(--purple); border-color: rgba(167,139,250,.4); }
+.series-card-name { font-size: 15px; font-weight: 600; }
+.series-card-meta { font-size: 12px; color: var(--muted); }
+.series-card-tags { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.series-card-join { margin-top: 10px; height: 36px; font-size: 13px; padding: 0 14px; }
+
+/* Series banner — shown at the top of the filtered session list */
+.series-banner {
+  background: rgba(167,139,250,0.07);
+  border: 1px solid rgba(167,139,250,0.18);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.series-banner-desc { font-size: 13px; color: var(--text); opacity: .85; }
+.series-banner-meta { font-size: 12px; color: var(--muted); }
+.series-banner-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.series-banner-cta  { height: 44px; font-size: 15px; }
+.series-copy-link-btn {
+  height: 36px; padding: 0 14px; font-size: 13px;
+  background: transparent; border: 1px solid rgba(167,139,250,.35);
+  color: var(--purple); border-radius: var(--radius-sm); cursor: pointer;
+  font-family: inherit; transition: background 120ms;
+}
+.series-copy-link-btn:hover { background: rgba(167,139,250,.1); }
+.series-invite-note { font-size: 12px; color: var(--muted); width: 100%; }
+.session-badge.full-badge { background: rgba(239,68,68,.12); color: #f87171; }
+
+/* Series pass badge (confirmed member) */
+.session-badge.series-pass-badge {
+  background: rgba(74,222,128,.12);
+  color: #4ade80;
+}
+
+/* "S" chip on attendee rows for series members */
+.att-chip.series-chip {
+  border-color: rgba(167,139,250,.6);
+  background:   rgba(167,139,250,.12);
+  color: var(--purple);
+  font-weight: 700;
+}
+
+/* Series members section in the filtered session list */
+.series-members-section {
+  padding: 12px 0 4px;
+}
+.series-members-section .detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/* Clickable history rows (sessions / series passes on profile) */
+.history-row.clickable-row {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 120ms;
+}
+.history-row.clickable-row:hover  { background: rgba(255,255,255,.04); }
+.history-row.clickable-row:active { background: rgba(255,255,255,.08); }
 
