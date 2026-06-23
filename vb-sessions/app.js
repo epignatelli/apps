@@ -285,6 +285,16 @@ getAuth().onAuthStateChanged(async user => {
 // Browser back/forward → route within the app instead of exiting
 window.addEventListener('popstate', () => { _routeFromHash(); });
 
+// Firestore .get() can stall indefinitely on mobile after cross-origin navigation
+// (e.g. returning from Stripe checkout). Race against a 12-second timeout so the
+// catch handler can show a retry message rather than an infinite spinner.
+function _fsGet(ref) {
+  return Promise.race([
+    ref.get(),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+  ]);
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -650,7 +660,7 @@ async function openSession(id) {
   footer.innerHTML  = '';
 
   try {
-    const sessionDoc = await _sessionRef(id).get();
+    const sessionDoc = await _fsGet(_sessionRef(id));
     if (!sessionDoc.exists) { goHome(); return; }
 
     const session = { id: sessionDoc.id, ...sessionDoc.data() };
@@ -664,15 +674,15 @@ async function openSession(id) {
     if (_currentUser) {
       const wlRef = getDb().collection('sessions').doc(id).collection('waitingList');
       const [attendeesSnap, ownWlSnap] = await Promise.all([
-        _attendeesRef(id).orderBy('joinedAt', 'asc').get(),
-        wlRef.doc(_currentUser.uid).get(),
+        _fsGet(_attendeesRef(id).orderBy('joinedAt', 'asc')),
+        _fsGet(wlRef.doc(_currentUser.uid)),
       ]);
       attendees         = attendeesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       _currentAttendees = attendees;
       isAttending       = attendees.some(a => a.id === _currentUser.uid);
 
       try {
-        const wlSnap = await wlRef.orderBy('joinedAt', 'asc').get();
+        const wlSnap = await _fsGet(wlRef.orderBy('joinedAt', 'asc'));
         waitingList      = wlSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         myWaitingListPos = waitingList.findIndex(w => w.id === _currentUser.uid) + 1;
       } catch {
@@ -687,15 +697,16 @@ async function openSession(id) {
     let seriesReg = null;
     if (_currentUser && session.seriesId) {
       try {
-        const regDoc = await _seriesColRef().doc(session.seriesId)
-          .collection('registrations').doc(_currentUser.uid).get();
+        const regDoc = await _fsGet(_seriesColRef().doc(session.seriesId)
+          .collection('registrations').doc(_currentUser.uid));
         if (regDoc.exists && regDoc.data().paymentStatus === 'paid') seriesReg = regDoc.data();
       } catch(e) { /* non-critical */ }
     }
 
     _renderDetail(session, attendees, isAttending, waitingList, myWaitingListPos, content, footer, seriesReg);
   } catch(e) {
-    content.innerHTML = '<div class="home-empty">Couldn\'t load session.</div>';
+    const isTimeout = e.message === 'timeout';
+    content.innerHTML = `<div class="home-empty">${isTimeout ? 'Loading took too long.' : 'Couldn\'t load session.'} <button class="link-btn" onclick="openSession('${id}')">Retry</button></div>`;
     console.error(e);
   }
 }
