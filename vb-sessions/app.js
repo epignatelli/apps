@@ -558,7 +558,10 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
     footer.innerHTML = `<button class="cta-btn" disabled>Session cancelled</button>`;
   } else if (canStart) {
     const joinBtn = !isAttending && !isFull && !deadlinePassed
-      ? `<button class="cta-btn secondary-btn" onclick="${_isAdmin && session.cost > 0 ? `registerFree('${session.id}')` : `register('${session.id}')`}">${_isAdmin && session.cost > 0 ? 'Register free →' : 'Join →'}</button>`
+      ? _isAdmin && session.cost > 0
+        ? `<button class="cta-btn secondary-btn" onclick="registerFree('${session.id}')">Register free →</button>
+           <button class="cta-btn secondary-btn" onclick="register('${session.id}')">Pay and join →</button>`
+        : `<button class="cta-btn secondary-btn" onclick="register('${session.id}')">Join →</button>`
       : '';
     footer.innerHTML = `
       <button class="cta-btn" onclick="openSessionRun('${session.id}')">▶ Start session</button>
