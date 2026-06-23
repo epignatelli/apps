@@ -129,28 +129,52 @@ async function handleAuthClick() {
   }
 }
 
+// ─── Nav helpers ───────────────────────────────────────────────────────────────
+let _backFn            = null;
+let _pendingCoachRequest = false;
+
+function _setNav(mode, activeTab) {
+  const tabsRow = document.getElementById('nav-tabs-row');
+  const backBtn = document.getElementById('nav-back-btn');
+  const isPrimary = mode === 'primary';
+  const showTabs  = isPrimary && _isAdmin;
+  if (tabsRow) tabsRow.style.display = showTabs ? 'flex' : 'none';
+  if (backBtn) backBtn.style.display = isPrimary ? 'none' : '';
+  document.documentElement.style.setProperty('--header-h', showTabs ? '95px' : '55px');
+  document.querySelectorAll('.nav-tab').forEach(t =>
+    t.classList.toggle('active', !!activeTab && t.dataset.tab === activeTab)
+  );
+}
+
+function _setTitle(title) {
+  const el = document.getElementById('nav-screen-title');
+  if (el) el.textContent = title || '';
+}
+
+function _setBack(fn) { _backFn = fn; }
+function _navBack() { if (_backFn) _backFn(); }
+
 function _updateAuthUI() {
-  const btn          = document.getElementById('auth-btn');
-  const newBtn       = document.getElementById('home-new-btn');
-  const usersBtn     = document.getElementById('home-users-btn');
-  const financesBtn  = document.getElementById('home-finances-btn');
-  const insightsBtn  = document.getElementById('home-insights-btn');
-  const venuesBtn    = document.getElementById('home-venues-btn');
-  const profileBtn   = document.getElementById('home-profile-btn');
-  if (_currentUser) {
-    const label = _currentUser.displayName?.split(' ')[0] || _currentUser.email;
-    btn.textContent = `${esc(label)} · Sign out`;
-    btn.classList.add('auth-btn--signed-in');
-  } else {
-    btn.textContent = 'Sign in';
-    btn.classList.remove('auth-btn--signed-in');
+  const avatarWrap = document.getElementById('nav-avatar-wrap');
+  if (avatarWrap) {
+    if (_currentUser) {
+      const photo    = _currentUser.photoURL;
+      const initials = (_currentUser.displayName || _currentUser.email || '?')[0].toUpperCase();
+      avatarWrap.innerHTML = `<button class="avatar-btn" onclick="openProfileScreen()" title="Profile">${photo ? `<img src="${esc(photo)}" alt="" referrerpolicy="no-referrer">` : esc(initials)}</button>`;
+    } else {
+      avatarWrap.innerHTML = `<button class="auth-btn" onclick="handleAuthClick()">Sign in</button>`;
+    }
   }
-  if (newBtn)      newBtn.style.display      = _isAdmin     ? '' : 'none';
-  if (usersBtn)    usersBtn.style.display    = _isAdmin     ? '' : 'none';
-  if (financesBtn) financesBtn.style.display = _isAdmin     ? '' : 'none';
-  if (insightsBtn) insightsBtn.style.display  = _isAdmin     ? '' : 'none';
-  if (venuesBtn)   venuesBtn.style.display    = _isAdmin     ? '' : 'none';
-  if (profileBtn)  profileBtn.style.display  = _currentUser ? '' : 'none';
+  const newBtn = document.getElementById('home-new-btn');
+  if (newBtn) newBtn.style.display = _isAdmin ? '' : 'none';
+  // Refresh tab strip (e.g. player logged in, then promoted to admin)
+  const tabsRow = document.getElementById('nav-tabs-row');
+  if (tabsRow && tabsRow.style.display !== 'none') {
+    if (!_isAdmin) {
+      tabsRow.style.display = 'none';
+      document.documentElement.style.setProperty('--header-h', '55px');
+    }
+  }
 }
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
@@ -190,6 +214,11 @@ getAuth().onAuthStateChanged(async user => {
       _pendingJoinSessionId = null;
       await register(sid);
     }
+
+    if (_pendingCoachRequest) {
+      _pendingCoachRequest = false;
+      openProfileScreen();
+    }
   } else {
     _currentRoles = [];
     _isAdmin  = false;
@@ -218,11 +247,17 @@ function _setHash(hash) {
 
 async function _routeFromHash() {
   const hash = location.hash.replace(/^#\/?/, '');
-  if (!hash || hash === 'home') { renderHome(); return; }
+  if (!hash || hash === 'home') { goHome(); return; }
   if (hash === 'users')         { if (_isAdmin) openUsersScreen();    else renderHome(); return; }
   if (hash === 'finances')      { if (_isAdmin) openFinancesScreen(); else renderHome(); return; }
   if (hash === 'insights')      { if (_isAdmin) openInsightsScreen(); else renderHome(); return; }
   if (hash === 'venues')        { if (_isAdmin) openVenuesScreen();   else renderHome(); return; }
+  if (hash === 'admin')         { if (_isAdmin) openAdminScreen();    else renderHome(); return; }
+  if (hash === 'coach') {
+    if (_currentUser) { openProfileScreen(); }
+    else { _pendingCoachRequest = true; goHome(); showToast('Sign in to request coach status'); }
+    return;
+  }
   const slash   = hash.indexOf('/');
   const section = slash > -1 ? hash.slice(0, slash) : hash;
   const id      = slash > -1 ? hash.slice(slash + 1) : '';
@@ -232,9 +267,9 @@ async function _routeFromHash() {
   else if (section === 'end'     && id)  {
     try {
       await _loadRunSessionData(id);
-      document.getElementById('end-subtitle').textContent =
-        document.getElementById('run-subtitle').textContent;
       showScreen('session-end');
+      _setNav('sub', null);
+      _setBack(() => closeSessionEnd());
       _renderSessionEnd();
     } catch(e) { renderHome(); }
   }
@@ -244,7 +279,17 @@ async function _routeFromHash() {
 function goHome() {
   _setHash('home');
   showScreen('home');
+  _setNav('primary', 'home');
+  _setTitle('');
   renderHome();
+}
+
+function openAdminScreen() {
+  if (!_isAdmin) return;
+  _setHash('admin');
+  showScreen('admin');
+  _setNav('primary', 'admin');
+  _setTitle('');
 }
 
 function _formatDate(ts) {
@@ -415,6 +460,9 @@ function _renderSessionCard(s) {
 async function openSession(id) {
   _setHash('session/' + id);
   showScreen('detail');
+  _setNav('sub', null);
+  _setTitle('Session');
+  _setBack(() => goHome());
   const content = document.getElementById('detail-content');
   const footer  = document.getElementById('detail-footer');
   content.innerHTML = '<div class="home-empty">Loading…</div>';
@@ -452,8 +500,7 @@ async function openSession(id) {
       }
     }
 
-    document.getElementById('detail-subtitle').textContent =
-      [_formatDate(session.date), session.time].filter(Boolean).join(' · ');
+    _setTitle([_formatDate(session.date), session.time].filter(Boolean).join(' · '));
 
     _renderDetail(session, attendees, isAttending, waitingList, myWaitingListPos, content, footer);
   } catch(e) {
@@ -803,6 +850,9 @@ function openUsersScreen() {
   if (!_isAdmin) return;
   _setHash('users');
   showScreen('users');
+  _setNav('sub', null);
+  _setTitle('Users');
+  _setBack(() => openAdminScreen());
   renderUsers();
 }
 
@@ -1019,25 +1069,17 @@ async function openProfileScreen(uid) {
 
   _setHash('profile/' + targetUid);
   showScreen('profile');
+  _setNav('sub', null);
+  _setTitle('Profile');
+  _setBack(_profileBackDest === 'users'
+    ? () => openAdminScreen()
+    : _profileBackDest.startsWith('session/')
+      ? () => { const sid = _profileBackDest.slice(8); if (sid) openSession(sid); else goHome(); }
+      : () => goHome()
+  );
 
-  const body     = document.getElementById('profile-screen-body');
-  const subtitle = document.getElementById('profile-screen-subtitle');
-  const backBtn  = document.getElementById('profile-back-btn');
+  const body = document.getElementById('profile-screen-body');
   body.innerHTML = '<div class="home-empty">Loading…</div>';
-
-  backBtn.onclick = () => {
-    if (_profileBackDest === 'users') {
-      openUsersScreen();
-    } else if (_profileBackDest.startsWith('session/')) {
-      const sid = _profileBackDest.slice(8);
-      if (sid) openSession(sid); else goHome();
-    } else {
-      goHome();
-    }
-  };
-  backBtn.textContent = _profileBackDest === 'users' ? '← Users'
-    : _profileBackDest.startsWith('session/') ? '← Session'
-    : '← Sessions';
 
   try {
     const doc    = await _userRef(targetUid).get();
@@ -1047,7 +1089,7 @@ async function openProfileScreen(uid) {
     const hasCoach   = roles.includes('coach');
     const hasPending = !!u.coachRequest && !hasCoach;
 
-    subtitle.textContent = isOwn ? 'Your profile' : '';
+    if (isOwn) _setTitle('Your profile');
 
     const posLabels   = { setter: 'Setter', hitter: 'Hitter', middle: 'Middle', libero: 'Libero' };
     const genderLabel = { man: 'Man', woman: 'Woman', nonbinary: 'Non-binary' }[u.gender] || '';
@@ -1075,6 +1117,7 @@ async function openProfileScreen(uid) {
             onclick="requestCoachStatus()" ${hasPending ? 'disabled' : ''}>
             ${hasPending ? 'Coach request pending' : 'Request coach status →'}
           </button>` : ''}
+        <button class="cta-btn secondary-btn" onclick="handleAuthClick()" style="margin-top:8px">Sign out</button>
       </div>` : '';
 
     // Fetch session history and (for coaches) payment history in parallel
@@ -1490,13 +1533,14 @@ async function _loadRunSessionData(sessionId) {
   ]);
   _runSession   = { id: sessionDoc.id, ...sessionDoc.data() };
   _runAttendees = attendeesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-  document.getElementById('run-subtitle').textContent =
-    [_formatDate(_runSession.date), _runSession.time].filter(Boolean).join(' · ');
+  _setTitle([_formatDate(_runSession.date), _runSession.time].filter(Boolean).join(' · '));
 }
 
 async function openSessionRun(sessionId) {
   _setHash('run/' + sessionId);
   showScreen('session-run');
+  _setNav('sub', null);
+  _setBack(() => closeSessionRun());
   const content = document.getElementById('run-content');
   content.innerHTML = '<div class="home-empty">Loading…</div>';
   try {
@@ -1645,15 +1689,17 @@ function _saveEndEquipState(sessionId, state) {
 function openSessionEnd() {
   if (!_runSession) return;
   _setHash('end/' + _runSession.id);
-  document.getElementById('end-subtitle').textContent =
-    document.getElementById('run-subtitle').textContent;
   showScreen('session-end');
+  _setNav('sub', null);
+  _setBack(() => closeSessionEnd());
   _renderSessionEnd();
 }
 
 function closeSessionEnd() {
   _setHash('run/' + _runSession.id);
   showScreen('session-run');
+  _setNav('sub', null);
+  _setBack(() => closeSessionRun());
 }
 
 function _renderSessionEnd() {
@@ -2033,9 +2079,9 @@ async function openSessionEndReport(sessionId) {
     const sessionDoc = await _sessionRef(sessionId).get();
     _runSession = { id: sessionDoc.id, ...sessionDoc.data() };
     _setHash('end/' + sessionId);
-    document.getElementById('end-subtitle').textContent =
-      document.getElementById('run-subtitle').textContent;
     showScreen('session-end');
+    _setNav('sub', null);
+    _setBack(() => closeSessionEnd());
     _renderSessionEnd();
   } catch(e) {
     console.error(e);
@@ -2220,6 +2266,8 @@ function openFinancesScreen() {
   if (!_isAdmin) return;
   _setHash('finances');
   showScreen('finances');
+  _setNav('primary', 'finances');
+  _setTitle('');
   renderFinances();
 }
 
@@ -2446,6 +2494,8 @@ function openInsightsScreen() {
   if (!_isAdmin) return;
   _setHash('insights');
   showScreen('insights');
+  _setNav('primary', 'insights');
+  _setTitle('');
   renderInsights();
 }
 
@@ -2611,6 +2661,9 @@ function openVenuesScreen() {
   if (!_isAdmin) return;
   _setHash('venues');
   showScreen('venues');
+  _setNav('sub', null);
+  _setTitle('Venues');
+  _setBack(() => openAdminScreen());
   renderVenues();
 }
 

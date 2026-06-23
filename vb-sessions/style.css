@@ -34,51 +34,60 @@ body {
 }
 
 /* ─── Screens ────────────────────────────────────────────────────────────── */
-.screen { display: none; flex-direction: column; min-height: 100dvh; }
+:root { --header-h: 54px; }
+.screen { display: none; flex-direction: column; min-height: 100dvh; padding-top: var(--header-h); }
 .screen.active { display: flex; }
 
-/* ─── Header ─────────────────────────────────────────────────────────────── */
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
+/* ─── Global header ──────────────────────────────────────────────────────── */
+#app-header {
+  position: fixed; top: 0; left: 0; right: 0;
   background: var(--bg);
-  z-index: 10;
+  border-bottom: 1px solid var(--border);
+  z-index: 20;
+}
+.topbar-row {
+  display: flex; align-items: center;
+  padding: 0 20px; height: 54px; gap: 10px;
+}
+.topbar-left  { display: flex; align-items: center; gap: 10px; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.nav-home {
+  font-family: var(--sport); font-size: 13px; font-weight: 800;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--amber); text-decoration: none; flex-shrink: 0;
+}
+.nav-back {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 20px; line-height: 1;
+  padding: 4px 2px; transition: color .15s;
+}
+.nav-back:hover { color: var(--text); }
+.nav-screen-title {
+  font-family: var(--sport); font-size: 13px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
 }
 
-.logo {
-  width: 36px; height: 36px;
-  background: var(--amber);
-  border-radius: 10px;
+.nav-tabs-row {
+  display: flex; border-top: 1px solid var(--border); height: 40px;
+}
+.nav-tab {
+  flex: 1; background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; font-family: var(--sport); font-size: 12px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); transition: color .15s, border-color .15s; padding: 0;
+}
+.nav-tab.active { color: var(--text); border-bottom-color: var(--amber); }
+
+.avatar-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  overflow: hidden; border: 2px solid var(--border2);
+  background: var(--surface2); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  font-family: var(--sport); font-size: 13px; font-weight: 700;
+  color: var(--text); padding: 0; flex-shrink: 0;
 }
-.logo svg { width: 20px; height: 20px; }
-
-.app-header h1 {
-  font-family: var(--sport);
-  font-size: 22px; font-weight: 700;
-  letter-spacing: .02em; text-transform: uppercase;
-  line-height: 1;
-}
-.subtitle { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-.nav-btn {
-  background: var(--surface2);
-  border: 1px solid var(--border2);
-  border-radius: 99px;
-  color: var(--muted);
-  font-size: 12px; font-weight: 600;
-  padding: 6px 14px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color .15s;
-}
-.nav-btn:hover { color: var(--text); }
+.avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .auth-btn {
   background: var(--surface2);
@@ -91,15 +100,20 @@ body {
   white-space: nowrap;
   transition: color .15s;
 }
-.auth-btn--signed-in { color: var(--text); }
 
-.back-btn {
-  margin-left: auto;
-  background: none; border: none;
-  color: var(--muted); font-size: 13px; font-weight: 600;
-  cursor: pointer; padding: 6px 4px;
-  white-space: nowrap;
+/* ─── Admin hub screen ───────────────────────────────────────────────────── */
+.admin-nav-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0; border-top: 1px solid var(--border);
+  font-family: var(--sport); font-size: 20px; font-weight: 700;
+  letter-spacing: .03em; text-transform: uppercase;
+  color: var(--text); cursor: pointer;
+  transition: color .15s;
 }
+.admin-nav-row:last-child { border-bottom: 1px solid var(--border); }
+.admin-nav-row:hover { color: var(--amber); }
+.admin-nav-arrow { font-size: 18px; font-weight: 400; color: var(--muted); }
+.admin-nav-desc { font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; text-transform: none; }
 
 /* ─── Footer ─────────────────────────────────────────────────────────────── */
 .footer {
@@ -699,9 +713,9 @@ body {
 
 /* ── Print styles (session report) ──────────────────────────────────────── */
 @media print {
-  .app-header, .footer, .back-btn, .nav-btn, .auth-btn { display: none !important; }
+  #app-header, .footer { display: none !important; }
   body { background: #fff; color: #000; }
-  .screen { display: block !important; min-height: unset; }
+  .screen { display: block !important; min-height: unset; padding-top: 0 !important; }
   .screen:not(.active) { display: none !important; }
   #screen-session-end .detail-content, #screen-session-end .end-content { overflow: visible; }
   .run-section { break-inside: avoid; background: #fff; border: 1px solid #ccc; }
@@ -826,3 +840,4 @@ body {
 .venue-address { font-size: 11px; color: var(--muted); margin-left: 6px; }
 .venue-maps-link { font-size: 11px; color: var(--amber); margin-left: 6px; text-decoration: none; }
 .venue-maps-link:hover { text-decoration: underline; }
+

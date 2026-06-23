@@ -1,0 +1,28 @@
+/* Shared Roots component styles — imported by every page */
+
+.roots-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 36px 24px max(24px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255,255,255,0.07);
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+}
+.roots-footer-link {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #7a80a0;
+  text-decoration: none;
+}
+.roots-footer-link.dim {
+  opacity: .4;
+  cursor: default;
+  pointer-events: none;
+}
+.roots-footer-dot {
+  color: #7a80a0;
+  opacity: .25;
+  font-size: 12px;
+}

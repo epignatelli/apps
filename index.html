@@ -4,136 +4,176 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f1117" />
-  <title>Apps</title>
+  <title>Roots</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./shared.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     :root {
-      --bg:       #0f1117;
-      --surface:  #1a1d27;
-      --border:   rgba(255,255,255,0.07);
-      --border2:  rgba(255,255,255,0.14);
-      --text:     #f0f2f8;
-      --muted:    #7a80a0;
-      --green:    #22c97a;
-      --sport:    'Barlow Condensed', system-ui, sans-serif;
+      --bg:     #0f1117;
+      --border: rgba(255,255,255,0.07);
+      --text:   #f0f2f8;
+      --muted:  #7a80a0;
+      --amber:  #F0A500;
+      --sport:  'Barlow Condensed', system-ui, sans-serif;
     }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-family: var(--sport);
       background: var(--bg);
       color: var(--text);
       min-height: 100dvh;
       -webkit-font-smoothing: antialiased;
-    }
-    header {
-      padding: 32px 24px 24px;
-      border-bottom: 1px solid var(--border);
-    }
-    header h1 {
-      font-family: var(--sport);
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-    }
-    header p {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-    .apps {
-      padding: 24px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 12px;
-    }
-    .app-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 20px;
-      text-decoration: none;
-      color: inherit;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      transition: border-color .15s;
     }
-    .app-card:hover { border-color: var(--border2); }
-    .app-card-icon {
-      width: 48px; height: 48px;
-      background: var(--green);
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
+
+    /* ── Top bar ── */
+    .topbar { padding: 20px 24px; }
+    .brand {
+      font-size: 14px; font-weight: 800;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: var(--amber);
     }
-    .app-card-icon svg { width: 26px; height: 26px; }
-    .app-card h2 {
-      font-family: var(--sport);
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: .03em;
-      text-transform: uppercase;
+
+    /* ── Hero ── */
+    .hero {
+      padding: 40px 24px 52px;
+      display: flex; flex-direction: column; gap: 28px;
     }
-    .app-card p {
-      font-size: 13px;
+    .hero h1 {
+      font-size: clamp(52px, 15vw, 96px);
+      font-weight: 900; line-height: .92;
+      letter-spacing: -.01em; text-transform: uppercase;
+    }
+    .cta {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--amber); color: #0f1117;
+      text-decoration: none; font-size: 17px; font-weight: 800;
+      letter-spacing: .1em; text-transform: uppercase;
+      padding: 17px 22px; border-radius: 8px;
+      transition: opacity .15s;
+    }
+    .cta:hover { opacity: .88; }
+
+    /* ── Net divider ── */
+    .net {
+      display: block; width: calc(100% - 48px);
+      margin: 0 24px; height: 14px; opacity: .45;
+    }
+
+    /* ── Nav rows ── */
+    .nav-section {
+      padding: 32px 24px 16px;
+      display: flex; flex-direction: column;
+    }
+    .nav-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      align-items: center;
+      padding: 15px 0;
+      border-top: 1px solid var(--border);
+      text-decoration: none; color: inherit;
+      column-gap: 12px; row-gap: 2px;
+      cursor: pointer;
+    }
+    .nav-row:last-child { border-bottom: 1px solid var(--border); }
+    .nav-row.dim { opacity: .38; cursor: default; pointer-events: none; }
+    .nav-name {
+      font-size: 21px; font-weight: 700;
+      letter-spacing: .03em; text-transform: uppercase;
+      grid-column: 1; grid-row: 1;
+    }
+    .nav-desc {
+      font-size: 13px; font-weight: 400;
       color: var(--muted);
-      line-height: 1.6;
-      flex: 1;
+      grid-column: 1; grid-row: 2;
+      letter-spacing: 0;
     }
-    .app-card-open {
-      align-self: flex-start;
-      font-family: var(--sport);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: var(--green);
+    .nav-arrow {
+      font-size: 18px; font-weight: 400; color: var(--muted);
+      grid-column: 2; grid-row: 1 / 3;
+      transition: transform .15s, color .15s;
+    }
+    .nav-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted);
+      grid-column: 2; grid-row: 1 / 3;
+      align-self: center;
+    }
+    .nav-row:not(.dim):hover .nav-arrow { transform: translateX(4px); color: var(--text); }
+    .nav-row.featured .nav-name  { color: var(--amber); }
+    .nav-row.featured .nav-arrow { color: var(--amber); }
+    .nav-row.featured:hover .nav-arrow { opacity: .75; }
+
+    /* ── Footer ── */
+    footer { margin-top: auto; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cta, .nav-arrow { transition: none; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Apps</h1>
-    <p>A collection of tools for volleyball.</p>
-  </header>
 
-  <div class="apps">
-    <a class="app-card" href="./vb-lineups/">
-      <div class="app-card-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="6" width="20" height="12" rx="1.5" stroke-width="2"/>
-          <line x1="12" y1="6" x2="12" y2="18" stroke-width="2.5"/>
-          <line x1="7.5" y1="6" x2="7.5" y2="18" stroke-width="1.2"/>
-          <line x1="16.5" y1="6" x2="16.5" y2="18" stroke-width="1.2"/>
-        </svg>
+  <nav class="topbar">
+    <span class="brand">Roots</span>
+  </nav>
+
+  <main>
+
+    <section class="hero">
+      <h1>Volleyball<br>in London,<br>every week.</h1>
+      <a class="cta" href="./vb-sessions/">
+        Join in
+        <span>→</span>
+      </a>
+    </section>
+
+    <svg class="net" viewBox="0 0 320 14" preserveAspectRatio="none" aria-hidden="true">
+      <line x1="0"   y1="7" x2="320" y2="7" stroke="#F0A500" stroke-width="1.5"/>
+      <line x1="0"   y1="0" x2="0"   y2="14" stroke="#F0A500" stroke-width="2.5"/>
+      <line x1="320" y1="0" x2="320" y2="14" stroke="#F0A500" stroke-width="2.5"/>
+    </svg>
+
+    <section class="nav-section">
+
+      <a class="nav-row featured" href="./vb-sessions/">
+        <span class="nav-name">Sessions</span>
+        <span class="nav-desc">Sign up and play every week</span>
+        <span class="nav-arrow">→</span>
+      </a>
+
+      <div class="nav-row dim">
+        <span class="nav-name">Learn</span>
+        <span class="nav-desc">Drills, tactics, and technique</span>
+        <span class="nav-badge">Soon</span>
       </div>
-      <h2>VB Lineups</h2>
-      <p>Build valid lineups for mixed volleyball. Finds every combination that satisfies your gender rotation rules.</p>
-      <span class="app-card-open">Open →</span>
-    </a>
-    <a class="app-card" href="./kqotc/">
-      <div class="app-card-icon" style="background:#f5a623">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#0f1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 20h18"/>
-          <path d="M5 20 3 11l5 3.5L12 6l4 8.5L21 11l-2 9"/>
-        </svg>
-      </div>
-      <h2>KQOTC</h2>
-      <p>Run your King / Queen of the Court event. Manage check-in, auto-assign teams, track scores, and advance rounds.</p>
-      <span class="app-card-open">Open →</span>
-    </a>
-    <a class="app-card" href="./vb-sessions/">
-      <div class="app-card-icon" style="background:#7c6ef7">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/>
-          <path d="M16 2v4M8 2v4M3 10h18"/>
-        </svg>
-      </div>
-      <h2>Sessions</h2>
-      <p>Schedule and manage volleyball sessions. Players sign up, admins track attendance and costs.</p>
-      <span class="app-card-open" style="color:#7c6ef7">Open →</span>
-    </a>
-  </div>
+
+      <a class="nav-row" href="./vb-sessions/#coach">
+        <span class="nav-name">Coach with us</span>
+        <span class="nav-desc">Lead sessions and grow the community</span>
+        <span class="nav-arrow">→</span>
+      </a>
+
+      <a class="nav-row" href="./tools/">
+        <span class="nav-name">Apps</span>
+        <span class="nav-desc">Lineups, KQOTC, and more</span>
+        <span class="nav-arrow">→</span>
+      </a>
+
+    </section>
+
+  </main>
+
+  <footer class="roots-footer">
+    <span class="roots-footer-link dim">About</span>
+    <span class="roots-footer-dot">·</span>
+    <span class="roots-footer-link dim">Policy</span>
+  </footer>
+
 </body>
 </html>
