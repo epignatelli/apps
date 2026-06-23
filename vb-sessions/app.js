@@ -1065,10 +1065,10 @@ async function openProfileScreen(uid) {
     // Fetch session history and (for coaches) payment history in parallel
     const [historySnap, coachSessionsSnap] = await Promise.all([
       (isOwn || _isAdmin)
-        ? _sessionHistoryRef(targetUid).orderBy('date', 'desc').limit(25).get()
+        ? _sessionHistoryRef(targetUid).orderBy('date', 'desc').limit(25).get().catch(e => { console.warn('History query failed:', e); return null; })
         : Promise.resolve(null),
       (hasCoach || roles.includes('admin') || roles.includes('owner')) && _isAdmin
-        ? _sessionsRef().where('coachUid', '==', targetUid).where('status', '==', 'closed').orderBy('date', 'desc').limit(25).get()
+        ? _sessionsRef().where('coachUid', '==', targetUid).where('status', '==', 'closed').orderBy('date', 'desc').limit(25).get().catch(e => { console.warn('Coach sessions query failed:', e); return null; })
         : Promise.resolve(null),
     ]);
 
