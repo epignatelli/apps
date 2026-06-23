@@ -9,8 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="Sessions" />
   <title>Roots | Sessions</title>
   <link rel="manifest" href="./manifest.json" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../fonts/barlow-condensed.css" />
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="../shared.css" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -201,6 +200,10 @@
           </select>
         </div>
       </div>
+      <label class="form-insurance-label" id="form-insurance-wrap">
+        <input type="checkbox" id="form-insurance" />
+        I confirm I hold valid public liability insurance for this session
+      </label>
       <div class="form-error" id="form-error"></div>
       <button class="cta-btn" id="form-submit-btn" onclick="submitSessionForm()">Create session</button>
     </div>

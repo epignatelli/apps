@@ -901,6 +901,14 @@ async function register(sessionId) {
       _userRef(_currentUser.uid).get(),
       _sessionRef(sessionId).get(),
     ]);
+
+    // Age consent — one-time, stored on user doc
+    if (!userDoc.data()?.ageConsent) {
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+      _showAgeConsentModal(sessionId);
+      return;
+    }
+
     const needsGender    = !userDoc.data()?.gender;
     const needsPositions = sessionDoc.data()?.askPositions === true;
 
@@ -915,6 +923,41 @@ async function register(sessionId) {
   }
 
   await _doRegister(sessionId);
+}
+
+function _showAgeConsentModal(sessionId) {
+  const existing = document.getElementById('age-consent-overlay');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'age-consent-overlay';
+  el.className = 'overlay open';
+  el.innerHTML = `
+    <div class="panel" style="max-width:420px">
+      <div class="panel-header">
+        <span class="panel-title">Before you join</span>
+      </div>
+      <div style="padding:0 0 20px;font-size:14px;color:var(--muted);line-height:1.6">
+        Volleyball is a physical activity. Please confirm the following before booking your first session.
+      </div>
+      <label style="display:flex;gap:12px;align-items:flex-start;cursor:pointer;margin-bottom:20px">
+        <input type="checkbox" id="age-consent-check" style="margin-top:3px;flex-shrink:0" />
+        <span style="font-size:14px;color:var(--text);line-height:1.6">I am 16 or over (or a parent/guardian has consented to my participation), I am physically fit to take part, and I accept that volleyball carries an inherent risk of injury. I take part at my own risk.</span>
+      </label>
+      <div id="age-consent-error" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:12px"></div>
+      <button class="cta-btn" onclick="_confirmAgeConsent('${sessionId}')">Confirm &amp; continue</button>
+      <button class="cta-btn secondary-btn" style="margin-top:8px" onclick="document.getElementById('age-consent-overlay').remove()">Cancel</button>
+    </div>`;
+  document.body.appendChild(el);
+}
+
+async function _confirmAgeConsent(sessionId) {
+  if (!document.getElementById('age-consent-check').checked) {
+    document.getElementById('age-consent-error').textContent = 'Please tick the box to continue.';
+    return;
+  }
+  document.getElementById('age-consent-overlay').remove();
+  await _userRef(_currentUser.uid).update({ ageConsent: { confirmed: true, at: firebase.firestore.FieldValue.serverTimestamp() } });
+  await register(sessionId);
 }
 
 async function _doRegister(sessionId, extra = {}) {
@@ -1706,6 +1749,12 @@ function openSessionForm(id = null) {
   document.getElementById('form-repeat-count-wrap').style.display = '';
   document.getElementById('form-repeat-date-wrap').style.display  = 'none';
 
+  const insuranceWrap = document.getElementById('form-insurance-wrap');
+  if (insuranceWrap) {
+    insuranceWrap.style.display = id ? 'none' : '';
+    document.getElementById('form-insurance').checked = false;
+  }
+
   if (id) {
     titleEl.textContent  = 'Edit session';
     submitEl.textContent = 'Save changes';
@@ -1840,6 +1889,10 @@ async function submitSessionForm() {
   if (!dateVal)                    { errorEl.textContent = 'Please set a date.'; return; }
   if (!venueId)                    { errorEl.textContent = 'Please select a venue.'; return; }
   if (isNaN(maxVal) || maxVal < 1) { errorEl.textContent = 'Max players must be at least 1.'; return; }
+  const insuranceEl = document.getElementById('form-insurance');
+  if (insuranceEl && !_editingId && !insuranceEl.checked) {
+    errorEl.textContent = 'Please confirm you hold public liability insurance.'; return;
+  }
 
   errorEl.textContent = '';
   const btn = document.getElementById('form-submit-btn');
@@ -1858,6 +1911,7 @@ async function submitSessionForm() {
     cost:                 costVal,
     coachFee:             coachFeeVal,
     absorbFee:            document.getElementById('form-absorb-fee').checked,
+    ...(insuranceEl && !_editingId ? { insuranceDeclaredBy: _currentUser.uid, insuranceDeclaredAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
     playerPrice:          document.getElementById('form-absorb-fee').checked ? costVal : _playerPrice(costVal),
     askPositions:         document.getElementById('form-ask-positions').checked,
     type:                 typeVal,
