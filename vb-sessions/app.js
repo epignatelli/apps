@@ -1443,28 +1443,20 @@ async function banUser(uid, name) {
 }
 
 // ─── Profile screen ────────────────────────────────────────────────────────────
-let _profileBackDest = 'home'; // where the back button should go
-
 async function openProfileScreen(uid) {
   const targetUid = uid || (_currentUser && _currentUser.uid);
   if (!targetUid) return;
 
-  // Determine where "back" should go
-  const currentScreen = document.querySelector('.screen.active');
-  _profileBackDest = currentScreen?.id === 'screen-users' ? 'users'
-                   : currentScreen?.id === 'screen-detail' ? ('session/' + (_currentSession?.id || ''))
-                   : 'home';
+  const fromHash = location.hash.replace(/^#/, '') || 'home';
 
   _setHash('profile/' + targetUid);
   showScreen('profile');
   _setNav('sub', null);
   _setTitle('Profile');
-  _setBack(_profileBackDest === 'users'
-    ? () => openAdminScreen()
-    : _profileBackDest.startsWith('session/')
-      ? () => { const sid = _profileBackDest.slice(8); if (sid) openSession(sid); else goHome(); }
-      : () => goHome()
-  );
+  _setBack(async () => {
+    history.pushState(null, '', '#' + fromHash);
+    await _routeFromHash();
+  });
 
   const body = document.getElementById('profile-screen-body');
   body.innerHTML = '<div class="home-empty">Loading…</div>';
