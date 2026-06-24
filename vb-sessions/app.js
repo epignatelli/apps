@@ -234,6 +234,8 @@ function _updateAuthUI() {
   }
   const newBtn = document.getElementById('home-new-btn');
   if (newBtn) newBtn.style.display = _canCreate() ? '' : 'none';
+  const homeFooter = document.querySelector('#screen-home .footer');
+  if (homeFooter) homeFooter.style.display = _canCreate() ? '' : 'none';
   // Refresh admin-only tabs and tab strip visibility
   document.querySelectorAll('.admin-tab').forEach(t => {
     t.style.display = _isAdmin ? '' : 'none';
