@@ -1603,11 +1603,11 @@ async function openProfileScreen(uid) {
 
     const safeUid  = esc(targetUid);
     const safeName = esc(u.name || '');
-    const adminSection = _isAdmin && !isOwn && (hasPendingCoach || hasPendingProvider) ? `
+    const adminSection = _isAdmin && !isOwn && (hasPending || hasPendingProvider) ? `
       <div class="detail-section">
         <div class="detail-section-title">Pending requests</div>
         <div class="role-status-list">
-          ${hasPendingCoach ? `
+          ${hasPending ? `
             <div class="role-status-row">
               <span class="role-status-name">Coach</span>
               <div class="role-action-btns">
