@@ -179,7 +179,7 @@ let _allSeries           = [];
 let _editingSeriesId     = null;
 
 function _canCreate() {
-  return (_isAdmin || _isProvider) && _providerOnboardingComplete;
+  return _isProvider && _providerOnboardingComplete;
 }
 
 function _setNav(mode, activeTab) {
@@ -1778,7 +1778,8 @@ function onCoachSelectChange() {
 }
 
 function openSessionForm(id = null) {
-  if (!_isAdmin && !_isProvider) return;
+  if (!id && !_isProvider) return;                         // creating: providers only
+  if (id && !_isAdmin && !_isProvider) return;             // editing: admin or provider
   if (!id && !_providerOnboardingComplete) {
     showToast('Set up payments in your profile before creating sessions.', 'error');
     return;
@@ -2831,18 +2832,17 @@ function _updateProviderRequestBtn(data) {
   const stripeField = document.getElementById('provider-stripe-field');
   const btn         = document.getElementById('provider-request-btn');
   if (!field || !btn) return;
-  const roles        = data.roles || [];
-  const isProvider   = roles.includes('provider');
-  const isAdmin      = roles.includes('admin') || roles.includes('owner') || _legacyAdmin;
-  const isPending    = !!data.providerRequest && !isProvider;
-  const canCreate    = isAdmin || isProvider;
-  const needsStripe  = canCreate && !data.providerOnboardingComplete;
+  const roles      = data.roles || [];
+  const isProvider = roles.includes('provider');
+  const isPending  = !!data.providerRequest && !isProvider;
+  const needsStripe = isProvider && !data.providerOnboardingComplete;
 
-  // Hide the "request provider" row for admins (they're implicitly allowed) and approved providers
-  field.style.display = (isAdmin || isProvider) ? 'none' : '';
+  // Request row: hidden once approved as provider
+  field.style.display = isProvider ? 'none' : '';
+  // Stripe setup row: only shown after provider role is granted
   if (stripeField) stripeField.style.display = needsStripe ? '' : 'none';
 
-  if (!isAdmin && !isProvider) {
+  if (!isProvider) {
     if (isPending) {
       btn.textContent = 'Provider request pending';
       btn.disabled    = true;
@@ -3656,7 +3656,8 @@ async function openSeriesSessions(seriesId, seriesName) {
 // ── Series form ──
 
 function openSeriesForm(id) {
-  if (!_isAdmin && !_isProvider) return;
+  if (!id && !_isProvider) return;                         // creating: providers only
+  if (id && !_isAdmin && !_isProvider) return;             // editing: admin or provider
   if (!id && !_providerOnboardingComplete) {
     showToast('Set up payments in your profile before creating series.', 'error');
     return;

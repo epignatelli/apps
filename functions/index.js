@@ -1405,9 +1405,8 @@ exports.providerOnboardingLink = functions
     if (!userSnap.exists) return res.status(404).json({ error: 'User not found.' });
 
     const userData = userSnap.data();
-    const roles = userData.roles || [];
-    const canOnboard = roles.includes('provider') || roles.includes('admin') || roles.includes('owner');
-    if (!canOnboard) return res.status(403).json({ error: 'Not authorised.' });
+    if (!(userData.roles || []).includes('provider'))
+      return res.status(403).json({ error: 'Provider role required.' });
 
     const stripe  = getStripe();
     const baseUrl = 'https://epignatelli.github.io/apps/vb-sessions/';
