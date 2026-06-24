@@ -200,13 +200,11 @@ function _setNav(mode, activeTab) {
   const showFilters = showTabs && activeTab === 'home';
   if (tabsRow) tabsRow.style.display = showTabs ? 'flex' : 'none';
   if (backBtn) backBtn.style.display = isPrimary ? 'none' : '';
-  const filtersRow = document.getElementById('home-filters');
-  const wasHidden  = filtersRow && filtersRow.style.display === 'none';
-  if (filtersRow) filtersRow.style.display = showFilters ? 'flex' : 'none';
+  const filterBar = document.getElementById('filter-bar');
+  const wasHidden = filterBar && filterBar.style.display === 'none';
+  if (filterBar) filterBar.style.display = showFilters ? 'flex' : 'none';
   if (showFilters && wasHidden) _loadHostFilterPills();
-  document.documentElement.style.setProperty(
-    '--header-h', showFilters ? '172px' : showTabs ? '95px' : '55px'
-  );
+  document.documentElement.style.setProperty('--header-h', showTabs ? '95px' : '55px');
   document.querySelectorAll('.admin-tab').forEach(t => {
     t.style.display = _isAdmin ? '' : 'none';
   });
@@ -412,49 +410,85 @@ async function _routeFromHash() {
   else { renderHome(); }
 }
 
-function _syncFilterPillsToState() {
-  document.querySelectorAll('#filter-host-pills  .level-pill').forEach(b => b.classList.toggle('active', (b.dataset.host   || '') === (_activeProviderFilter || '')));
-  document.querySelectorAll('#filter-level-pills .level-pill').forEach(b => b.classList.toggle('active', (b.dataset.level  || '') === (_activeLevelFilter    || '')));
-  document.querySelectorAll('#filter-gender-pills .level-pill').forEach(b => b.classList.toggle('active', (b.dataset.gender || '') === (_activeGenderFilter   || '')));
+const _LEVEL_LABELS  = { '': 'Level', any: 'Any level', beginner: 'Beginner', intermediate: 'Intermed.', advanced: 'Advanced', competitive: 'Competit.' };
+const _GENDER_LABELS = { '': 'Gender', mixed: 'Mixed', women: 'Women', men: 'Men' };
+
+function _updateFbarBtn(type, isActive, label) {
+  const btn  = document.getElementById('fbtn-' + type);
+  const span = document.getElementById('flabel-' + type);
+  if (btn)  btn.classList.toggle('active', !!isActive);
+  if (span) span.textContent = label;
 }
 
-function setHostFilter(uid) {
+function _closePopovers() {
+  document.querySelectorAll('.fbar-pop').forEach(p => p.classList.remove('open'));
+}
+
+function toggleFilterPopover(type) {
+  const pop = document.getElementById('fpop-' + type);
+  if (!pop) return;
+  const wasOpen = pop.classList.contains('open');
+  _closePopovers();
+  if (!wasOpen) pop.classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.fbar-item')) _closePopovers();
+});
+
+function _syncFilterPillsToState() {
+  document.querySelectorAll('#fpop-level  .fpop-opt').forEach(b => b.classList.toggle('active', (b.dataset.level  || '') === (_activeLevelFilter    || '')));
+  document.querySelectorAll('#fpop-gender .fpop-opt').forEach(b => b.classList.toggle('active', (b.dataset.gender || '') === (_activeGenderFilter   || '')));
+  _updateFbarBtn('level',  _activeLevelFilter,  _LEVEL_LABELS[_activeLevelFilter  || ''] || 'Level');
+  _updateFbarBtn('gender', _activeGenderFilter, _GENDER_LABELS[_activeGenderFilter || ''] || 'Gender');
+  _updateFbarBtn('host',   _activeProviderFilter, _activeProviderFilter ? 'Host ✓' : 'Host');
+}
+
+function setHostFilter(uid, name) {
   _activeProviderFilter = uid || null;
-  document.querySelectorAll('#filter-host-pills .level-pill').forEach(btn => {
-    btn.classList.toggle('active', (btn.dataset.host || '') === (uid || ''));
-  });
+  document.querySelectorAll('#fpop-host .fpop-opt').forEach(b =>
+    b.classList.toggle('active', (b.dataset.host || '') === (uid || ''))
+  );
+  _updateFbarBtn('host', uid, uid ? (name || 'Host') : 'Host');
+  _closePopovers();
   renderHome();
 }
 
 function setLevelFilter(level) {
   _activeLevelFilter = level || null;
-  document.querySelectorAll('#filter-level-pills .level-pill').forEach(btn => {
-    btn.classList.toggle('active', (btn.dataset.level || '') === (level || ''));
-  });
+  document.querySelectorAll('#fpop-level .fpop-opt').forEach(b =>
+    b.classList.toggle('active', (b.dataset.level || '') === (level || ''))
+  );
+  _updateFbarBtn('level', level, _LEVEL_LABELS[level || ''] || 'Level');
+  _closePopovers();
   renderHome();
 }
 
 function setGenderFilter(gender) {
   _activeGenderFilter = gender || null;
-  document.querySelectorAll('#filter-gender-pills .level-pill').forEach(btn => {
-    btn.classList.toggle('active', (btn.dataset.gender || '') === (gender || ''));
-  });
+  document.querySelectorAll('#fpop-gender .fpop-opt').forEach(b =>
+    b.classList.toggle('active', (b.dataset.gender || '') === (gender || ''))
+  );
+  _updateFbarBtn('gender', gender, _GENDER_LABELS[gender || ''] || 'Gender');
+  _closePopovers();
   renderHome();
 }
 
 async function _loadHostFilterPills() {
-  const container = document.getElementById('filter-host-pills');
+  const container = document.getElementById('fpop-host');
   if (!container) return;
   try {
-    const snap = await _userRef && getDb().collection('users')
-      .where('roles', 'array-contains', 'provider').get();
-    if (!snap || snap.empty) return;
+    const snap = await getDb().collection('users').where('roles', 'array-contains', 'provider').get();
+    if (!snap || snap.empty) {
+      container.innerHTML = `<button class="fpop-opt active" data-host="" onclick="setHostFilter('')">All</button>`;
+      return;
+    }
     const hosts = snap.docs.map(d => ({ uid: d.id, name: d.data().name || d.id }));
-    const current = _activeProviderFilter || '';
+    const cur = _activeProviderFilter || '';
     container.innerHTML =
-      `<button class="level-pill${current === '' ? ' active' : ''}" data-host="" onclick="setHostFilter('')">All</button>` +
+      `<button class="fpop-opt${cur === '' ? ' active' : ''}" data-host="" onclick="setHostFilter('')">All</button>` +
       hosts.map(h =>
-        `<button class="level-pill${current === h.uid ? ' active' : ''}" data-host="${esc(h.uid)}" onclick="setHostFilter('${esc(h.uid)}')">${esc(h.name)}</button>`
+        `<button class="fpop-opt${cur === h.uid ? ' active' : ''}" data-host="${esc(h.uid)}" onclick="setHostFilter('${esc(h.uid)}','${esc(h.name)}')">${esc(h.name)}</button>`
       ).join('');
   } catch(e) { console.error('Load hosts failed:', e); }
 }

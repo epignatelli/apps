@@ -38,34 +38,6 @@
     <button class="nav-tab admin-tab"  data-tab="insights" onclick="openInsightsScreen()">Insights</button>
     <button class="nav-tab admin-tab"  data-tab="admin"    onclick="openAdminScreen()">Admin</button>
   </div>
-  <div class="home-filters" id="home-filters" style="display:none">
-    <div class="filter-row">
-      <span class="filter-row-label">Host</span>
-      <div class="filter-row-pills" id="filter-host-pills">
-        <button class="level-pill active" data-host="" onclick="setHostFilter('')">All</button>
-      </div>
-    </div>
-    <div class="filter-row">
-      <span class="filter-row-label">Level</span>
-      <div class="filter-row-pills" id="filter-level-pills">
-        <button class="level-pill active" data-level=""             onclick="setLevelFilter('')">All</button>
-        <button class="level-pill"        data-level="any"          onclick="setLevelFilter('any')">Any</button>
-        <button class="level-pill"        data-level="beginner"     onclick="setLevelFilter('beginner')">Beginner</button>
-        <button class="level-pill"        data-level="intermediate" onclick="setLevelFilter('intermediate')">Intermediate</button>
-        <button class="level-pill"        data-level="advanced"     onclick="setLevelFilter('advanced')">Advanced</button>
-        <button class="level-pill"        data-level="competitive"  onclick="setLevelFilter('competitive')">Competitive</button>
-      </div>
-    </div>
-    <div class="filter-row">
-      <span class="filter-row-label">Gender</span>
-      <div class="filter-row-pills" id="filter-gender-pills">
-        <button class="level-pill active" data-gender=""       onclick="setGenderFilter('')">All</button>
-        <button class="level-pill"        data-gender="mixed"  onclick="setGenderFilter('mixed')">Mixed</button>
-        <button class="level-pill"        data-gender="women"  onclick="setGenderFilter('women')">Women</button>
-        <button class="level-pill"        data-gender="men"    onclick="setGenderFilter('men')">Men</button>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════
@@ -79,14 +51,6 @@
 
   <div class="footer">
     <button class="cta-btn" id="home-new-btn" onclick="openSessionForm()" style="display:none">+ New session</button>
-  </div>
-  <div class="home-filters" id="home-filters">
-    <button class="level-pill active" data-level=""             onclick="setLevelFilter('')">All</button>
-    <button class="level-pill"        data-level="any"          onclick="setLevelFilter('any')">Any level</button>
-    <button class="level-pill"        data-level="beginner"     onclick="setLevelFilter('beginner')">Beginner</button>
-    <button class="level-pill"        data-level="intermediate" onclick="setLevelFilter('intermediate')">Intermediate</button>
-    <button class="level-pill"        data-level="advanced"     onclick="setLevelFilter('advanced')">Advanced</button>
-    <button class="level-pill"        data-level="competitive"  onclick="setLevelFilter('competitive')">Competitive</button>
   </div>
 
   <!-- Create / Edit session panel -->
@@ -647,5 +611,41 @@
   });
 </script>
 <script src="./app.js"></script>
+
+<!-- ── Filter bar (fixed bottom, home screen only) ──────────────────────── -->
+<div class="fbar" id="filter-bar" style="display:none">
+  <div class="fbar-item">
+    <div class="fbar-pop" id="fpop-host">
+      <!-- populated by _loadHostFilterPills() -->
+    </div>
+    <button class="fbar-btn" id="fbtn-host" onclick="toggleFilterPopover('host')">
+      <span id="flabel-host">Host</span><span class="fbar-caret">▾</span>
+    </button>
+  </div>
+  <div class="fbar-item">
+    <div class="fbar-pop" id="fpop-level">
+      <button class="fpop-opt active" data-level=""             onclick="setLevelFilter('')">All</button>
+      <button class="fpop-opt"        data-level="any"          onclick="setLevelFilter('any')">Any level</button>
+      <button class="fpop-opt"        data-level="beginner"     onclick="setLevelFilter('beginner')">Beginner</button>
+      <button class="fpop-opt"        data-level="intermediate" onclick="setLevelFilter('intermediate')">Intermediate</button>
+      <button class="fpop-opt"        data-level="advanced"     onclick="setLevelFilter('advanced')">Advanced</button>
+      <button class="fpop-opt"        data-level="competitive"  onclick="setLevelFilter('competitive')">Competitive</button>
+    </div>
+    <button class="fbar-btn" id="fbtn-level" onclick="toggleFilterPopover('level')">
+      <span id="flabel-level">Level</span><span class="fbar-caret">▾</span>
+    </button>
+  </div>
+  <div class="fbar-item">
+    <div class="fbar-pop" id="fpop-gender">
+      <button class="fpop-opt active" data-gender=""       onclick="setGenderFilter('')">All</button>
+      <button class="fpop-opt"        data-gender="mixed"  onclick="setGenderFilter('mixed')">Mixed</button>
+      <button class="fpop-opt"        data-gender="women"  onclick="setGenderFilter('women')">Women</button>
+      <button class="fpop-opt"        data-gender="men"    onclick="setGenderFilter('men')">Men</button>
+    </div>
+    <button class="fbar-btn" id="fbtn-gender" onclick="toggleFilterPopover('gender')">
+      <span id="flabel-gender">Gender</span><span class="fbar-caret">▾</span>
+    </button>
+  </div>
+</div>
 </body>
 </html>
