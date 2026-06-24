@@ -263,6 +263,14 @@ exports.createSeriesCheckoutSession = functions
       return res.json({ ok: true });
     }
 
+    // Route payment to provider's Stripe account if the series has one
+    let seriesTransferData;
+    if (series.providerUid) {
+      const providerSnap = await db.collection('users').doc(series.providerUid).get();
+      const providerStripeId = providerSnap.data()?.stripeAccountId;
+      if (providerStripeId) seriesTransferData = { destination: providerStripeId };
+    }
+
     let checkout;
     try {
       checkout = await getStripe().checkout.sessions.create({
@@ -280,6 +288,7 @@ exports.createSeriesCheckoutSession = functions
         metadata: { type: 'series', seriesId, uid, inviteToken: inviteToken || '', wasAtCapacity: isFull ? 'true' : 'false' },
         success_url: successUrl,
         cancel_url:  cancelUrl,
+        ...(seriesTransferData ? { transfer_data: seriesTransferData, application_fee_amount: 0 } : {}),
       });
     } catch (e) {
       console.error('Stripe series checkout error:', e.message);

@@ -218,7 +218,7 @@ function _updateAuthUI() {
     t.style.display = _isAdmin ? '' : 'none';
   });
   const seriesFooter = document.getElementById('series-footer');
-  if (seriesFooter) seriesFooter.style.display = _isAdmin ? '' : 'none';
+  if (seriesFooter) seriesFooter.style.display = (_isAdmin || _isProvider) ? '' : 'none';
   const tabsRow = document.getElementById('nav-tabs-row');
   if (tabsRow && !_currentUser) {
     tabsRow.style.display = 'none';
@@ -3397,7 +3397,7 @@ function openSeriesScreen() {
   _setNav('primary', 'series');
   _setTitle('Sessions');
   const footer = document.getElementById('series-footer');
-  if (footer) footer.style.display = _isAdmin ? '' : 'none';
+  if (footer) footer.style.display = (_isAdmin || _isProvider) ? '' : 'none';
   renderSeries();
 }
 
@@ -3407,7 +3407,7 @@ async function renderSeries() {
   try {
     await _loadSeries();
     if (!_allSeries.length) {
-      list.innerHTML = '<div class="home-empty">No series yet.' + (_isAdmin ? ' Add one below.' : '') + '</div>';
+      list.innerHTML = '<div class="home-empty">No series yet.' + ((_isAdmin || _isProvider) ? ' Add one below.' : '') + '</div>';
       return;
     }
     // Load all user registrations in one batch so cards can show join/pass status
@@ -3458,7 +3458,7 @@ function _renderSeriesCard(s, hasPass = false) {
         ${meta ? `<div class="series-card-meta">${meta}</div>` : ''}
         ${joinBtn}${passBadge}${fullBadge}
       </div>
-      ${_isAdmin ? `
+      ${(_isAdmin || (_isProvider && _currentUser && s.providerUid === _currentUser.uid)) ? `
         <div class="session-admin-btns" onclick="event.stopPropagation()">
           <button class="icon-btn" onclick="openSeriesForm('${s.id}')" title="Edit">✎</button>
           <button class="icon-btn" onclick="copySeriesInviteLink('${s.id}')" title="Copy invite link">🔗</button>
@@ -3641,7 +3641,7 @@ async function openSeriesSessions(seriesId, seriesName) {
 // ── Series form ──
 
 function openSeriesForm(id) {
-  if (!_isAdmin) return;
+  if (!_isAdmin && !_isProvider) return;
   _editingSeriesId = id || null;
   const s = id ? _allSeries.find(x => x.id === id) : null;
   document.getElementById('series-form-title').textContent = s ? 'Edit series' : 'New series';
@@ -3689,6 +3689,7 @@ async function submitSeriesForm() {
       await _seriesColRef().doc(_editingSeriesId).update(data);
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      if (_isProvider && !_isAdmin) data.providerUid = _currentUser.uid;
       await _seriesColRef().add(data);
     }
     closeSeriesForm();
