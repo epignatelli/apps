@@ -1576,7 +1576,7 @@ async function openProfileScreen(uid) {
               ? _roleCheck
               : hasPendingProvider
                 ? `<span class="role-status-pending">Request pending</span>`
-                : `<button class="role-status-btn" id="provider-request-view-btn" onclick="requestProviderStatusFromView()">Host with us →</button>`}
+                : `<button class="role-status-btn" id="provider-request-view-btn" onclick="requestProviderStatusFromView()">Request →</button>`}
           </div>
           <div class="role-status-row role-status-row--dim">
             <span class="role-status-name">Admin</span>
