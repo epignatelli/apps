@@ -195,10 +195,15 @@ function _setNav(mode, activeTab) {
   const tabsRow = document.getElementById('nav-tabs-row');
   const backBtn = document.getElementById('nav-back-btn');
   const isPrimary = mode === 'primary';
-  const showTabs  = isPrimary && !!_currentUser;
+  const showTabs    = isPrimary && !!_currentUser;
+  const showFilters = showTabs && activeTab === 'home';
   if (tabsRow) tabsRow.style.display = showTabs ? 'flex' : 'none';
   if (backBtn) backBtn.style.display = isPrimary ? 'none' : '';
-  document.documentElement.style.setProperty('--header-h', showTabs ? '95px' : '55px');
+  const filtersRow = document.getElementById('home-filters');
+  if (filtersRow) filtersRow.style.display = showFilters ? 'flex' : 'none';
+  document.documentElement.style.setProperty(
+    '--header-h', showFilters ? '133px' : showTabs ? '95px' : '55px'
+  );
   document.querySelectorAll('.admin-tab').forEach(t => {
     t.style.display = _isAdmin ? '' : 'none';
   });

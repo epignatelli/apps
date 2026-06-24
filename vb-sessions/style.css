@@ -160,12 +160,12 @@ body {
 .icon-btn.danger:hover { color: var(--red); border-color: var(--red); }
 .icon-btn.small { width: 22px; height: 22px; font-size: 11px; }
 
-/* ─── Home filters ───────────────────────────────────────────────────────── */
+/* ─── Home filters (lives inside #app-header, fixed at top) ─────────────── */
 .home-filters {
   display: flex; gap: 8px; align-items: center;
-  padding: 8px 16px; border-bottom: 1px solid var(--border);
+  padding: 6px 16px 8px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
-  scrollbar-width: none; flex-shrink: 0;
+  scrollbar-width: none;
 }
 .home-filters::-webkit-scrollbar { display: none; }
 .level-pill {
