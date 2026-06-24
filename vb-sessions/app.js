@@ -1962,7 +1962,7 @@ async function submitSessionForm() {
     coachFee:             coachFeeVal,
     absorbFee:            _isAdmin ? document.getElementById('form-absorb-fee').checked : false,
     ...(insuranceEl && !_editingId ? { insuranceDeclaredBy: _currentUser.uid, insuranceDeclaredAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
-    ...(!_editingId && _isProvider && !_isAdmin ? { providerUid: _currentUser.uid } : {}),
+    ...(!_editingId ? { providerUid: _currentUser.uid } : {}),
     playerPrice:          document.getElementById('form-absorb-fee').checked ? costVal : _playerPrice(costVal),
     askPositions:         document.getElementById('form-ask-positions').checked,
     type:                 typeVal,
@@ -3688,8 +3688,8 @@ async function submitSeriesForm() {
     if (_editingSeriesId) {
       await _seriesColRef().doc(_editingSeriesId).update(data);
     } else {
-      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      if (_isProvider && !_isAdmin) data.providerUid = _currentUser.uid;
+      data.createdAt   = firebase.firestore.FieldValue.serverTimestamp();
+      data.providerUid = _currentUser.uid;
       await _seriesColRef().add(data);
     }
     closeSeriesForm();
