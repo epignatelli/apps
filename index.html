@@ -47,7 +47,11 @@
       font-weight: 900; line-height: .92;
       letter-spacing: -.01em; text-transform: uppercase;
     }
+    .hero-ctas {
+      display: flex; gap: 10px;
+    }
     .cta {
+      flex: 1;
       display: flex; align-items: center; justify-content: space-between;
       background: var(--amber); color: #0f1117;
       text-decoration: none; font-size: 17px; font-weight: 800;
@@ -56,6 +60,11 @@
       transition: opacity .15s;
     }
     .cta:hover { opacity: .88; }
+    .cta.cta-ghost {
+      background: transparent; color: var(--text);
+      border: 1.5px solid rgba(255,255,255,0.18);
+    }
+    .cta.cta-ghost:hover { opacity: .7; }
 
     /* ── Net divider ── */
     .net {
@@ -126,10 +135,16 @@
 
     <section class="hero">
       <h1>Volleyball<br>in London,<br>every week.</h1>
-      <a class="cta" href="./vb-sessions/">
-        Join in
-        <span>→</span>
-      </a>
+      <div class="hero-ctas">
+        <a class="cta" href="./vb-sessions/">
+          Join in
+          <span>→</span>
+        </a>
+        <a class="cta cta-ghost" href="./vb-sessions/">
+          Host with us
+          <span>→</span>
+        </a>
+      </div>
     </section>
 
     <svg class="net" viewBox="0 0 320 14" preserveAspectRatio="none" aria-hidden="true">
