@@ -157,7 +157,7 @@ function _subscribeToUserDoc(user) {
       _pendingProviderRequest = false;
       if (_isProvider) _showProviderSessions(_currentUser?.uid);
       else openProfileScreen();
-    } else {
+    } else if (document.querySelector('.screen.active')?.id === 'screen-home') {
       renderHome();
     }
   }, err => console.error('User doc listener error:', err));
@@ -1511,8 +1511,10 @@ async function openProfileScreen(uid) {
     const u      = doc.exists ? { id: doc.id, ...doc.data() } : {};
     const isOwn  = _currentUser && targetUid === _currentUser.uid;
     const roles  = u.roles || ['player'];
-    const hasCoach   = roles.includes('coach');
-    const hasPending = !!u.coachRequest && !hasCoach;
+    const hasCoach           = roles.includes('coach');
+    const hasPending         = !!u.coachRequest && !hasCoach;
+    const hasProvider        = roles.includes('provider');
+    const hasPendingProvider = !!u.providerRequest && !hasProvider;
 
     if (isOwn) _setTitle('Your profile');
 
@@ -1544,6 +1546,11 @@ async function openProfileScreen(uid) {
           <button class="coach-request-btn${hasPending ? ' pending' : ''}" id="coach-request-btn"
             onclick="requestCoachStatus()" ${hasPending ? 'disabled' : ''}>
             ${hasPending ? 'Coach request pending' : 'Request coach status →'}
+          </button>` : ''}
+        ${!hasProvider ? `
+          <button class="coach-request-btn${hasPendingProvider ? ' pending' : ''}" id="provider-request-view-btn"
+            onclick="requestProviderStatusFromView()" ${hasPendingProvider ? 'disabled' : ''}>
+            ${hasPendingProvider ? 'Host request pending' : 'Host with us →'}
           </button>` : ''}
         <button class="cta-btn secondary-btn" onclick="handleAuthClick()" style="margin-top:8px">Sign out</button>
       </div>` : '';
@@ -2820,8 +2827,27 @@ async function requestProviderStatus() {
       updatedAt:       firebase.firestore.FieldValue.serverTimestamp(),
     });
     await callFn('notifyProviderRequest', { uid: _currentUser.uid, name: _currentUser.displayName || '' });
-    showToast('Provider request sent — an admin will review it.');
+    showToast('Host request sent — an admin will review it.');
     closeEditProfile();
+  } catch(e) {
+    console.error('Provider request failed:', e);
+    if (btn) btn.disabled = false;
+    showToast('Couldn\'t send request. Try again.', 'error');
+  }
+}
+
+async function requestProviderStatusFromView() {
+  if (!_currentUser) return;
+  const btn = document.getElementById('provider-request-view-btn');
+  if (btn) btn.disabled = true;
+  try {
+    await _userRef(_currentUser.uid).update({
+      providerRequest: true,
+      updatedAt:       firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await callFn('notifyProviderRequest', { uid: _currentUser.uid, name: _currentUser.displayName || '' });
+    showToast('Host request sent — an admin will review it.');
+    if (btn) { btn.textContent = 'Host request pending'; }
   } catch(e) {
     console.error('Provider request failed:', e);
     if (btn) btn.disabled = false;
