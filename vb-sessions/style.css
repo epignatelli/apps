@@ -163,32 +163,34 @@ body {
 /* ─── Bottom filter bar ──────────────────────────────────────────────────── */
 .fbar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
-  display: flex; gap: 8px;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding: 10px 16px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  display: flex;
+  background: rgba(15,17,23,.88);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding: 0 8px;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .fbar-item { position: relative; flex: 1; }
 .fbar-btn {
-  width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px;
-  background: var(--surface2); border: 1px solid var(--border2);
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px;
+  background: none; border: none; border-bottom: 2px solid transparent;
   color: var(--muted); font-family: var(--sport);
-  font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-  padding: 9px 8px; border-radius: var(--radius-sm);
-  cursor: pointer; transition: border-color 120ms, color 120ms;
+  font-size: 13px; font-weight: 600; letter-spacing: .02em;
+  padding: 14px 8px 12px;
+  cursor: pointer; transition: color 150ms, border-color 150ms;
   white-space: nowrap; overflow: hidden;
 }
-.fbar-btn.active { border-color: var(--amber); color: var(--amber); background: color-mix(in srgb, var(--amber) 10%, transparent); }
-.fbar-caret { font-size: 9px; flex-shrink: 0; opacity: .6; }
+.fbar-btn.active { color: var(--text); border-bottom-color: var(--amber); }
+.fbar-caret { font-size: 8px; flex-shrink: 0; opacity: .35; margin-top: 1px; }
+.fbar-btn.active .fbar-caret { opacity: .6; }
 .fbar-pop {
-  position: absolute; bottom: calc(100% + 10px); left: 50%;
+  position: absolute; bottom: calc(100% + 6px); left: 50%;
   transform: translateX(-50%);
-  background: var(--surface2); border: 1px solid var(--border2);
-  border-radius: var(--radius-md);
-  padding: 10px 12px; display: none;
-  flex-wrap: wrap; gap: 8px; min-width: 190px;
-  box-shadow: 0 -8px 28px rgba(0,0,0,.5);
+  background: #1a1d26; border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  padding: 12px 14px; display: none;
+  flex-wrap: wrap; gap: 7px; min-width: 180px;
+  box-shadow: 0 -4px 32px rgba(0,0,0,.6);
   z-index: 120;
 }
 .fbar-pop.open { display: flex; }
@@ -196,15 +198,15 @@ body {
 .fbar-item:last-child  .fbar-pop { left: auto; right: 0; transform: none; }
 .fpop-opt {
   flex-shrink: 0;
-  background: none; border: 1px solid var(--border2);
+  background: rgba(255,255,255,.06); border: none;
   color: var(--muted); font-family: var(--sport);
-  font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
-  padding: 5px 13px; border-radius: 99px; cursor: pointer;
-  transition: border-color 120ms, color 120ms, background 120ms;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  padding: 5px 12px; border-radius: 99px; cursor: pointer;
+  transition: background 120ms, color 120ms;
   white-space: nowrap;
 }
-.fpop-opt.active { background: var(--amber); border-color: var(--amber); color: #0f1117; }
-.fpop-opt:not(.active):hover { border-color: var(--amber); color: var(--amber); }
+.fpop-opt.active { background: var(--amber); color: #0f1117; }
+.fpop-opt:not(.active):hover { background: rgba(255,255,255,.12); color: var(--text); }
 
 /* ─── Home / session list ────────────────────────────────────────────────── */
 .filter-active-label {
@@ -212,8 +214,8 @@ body {
 }
 .filter-active-label strong { color: var(--amber); font-weight: 700; }
 
-.home-content { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 84px; display: flex; flex-direction: column; gap: 24px; }
-#screen-home .footer { padding-bottom: 76px; }
+.home-content { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 72px; display: flex; flex-direction: column; gap: 24px; }
+#screen-home .footer { padding-bottom: 64px; }
 .home-empty { color: var(--muted); font-size: 14px; text-align: center; padding: 40px 0; }
 .link-btn { background: none; border: none; color: var(--amber); font: inherit; cursor: pointer; text-decoration: underline; padding: 0; }
 
