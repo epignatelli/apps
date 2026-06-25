@@ -1049,6 +1049,106 @@ async function openSession(id) {
   }
 }
 
+// ─── Team builder ──────────────────────────────────────────────────────────────
+function _combos(arr, k) {
+  const res = [];
+  function bt(start, cur) {
+    if (cur.length === k) { res.push([...cur]); return; }
+    for (let i = start; i < arr.length; i++) { cur.push(arr[i]); bt(i + 1, cur); cur.pop(); }
+  }
+  bt(0, []);
+  return res;
+}
+
+function _buildLineups(attendees, minWomen) {
+  // Map session attendees → vb-lineups player format
+  const players = attendees
+    .filter(a => (a.positions || []).length)
+    .map(a => ({
+      id:        a.id,
+      name:      a.name,
+      gender:    a.gender === 'woman' ? 'f' : 'm',
+      positions: new Set(a.positions || []),
+    }));
+
+  const isW      = p => p.gender === 'f';
+  const setters  = players.filter(p => p.positions.has('setter'));
+  const middles  = players.filter(p => p.positions.has('middle'));
+  const liberos  = players.filter(p => p.positions.has('libero'));
+  const hitters  = players.filter(p => p.positions.has('hitter'));
+  const out      = [];
+
+  for (const s of setters) {
+    for (const h of _combos(hitters.filter(p => p.id !== s.id), 3)) {
+      const used = new Set([s.id, ...h.map(p => p.id)]);
+      for (const m of _combos(middles.filter(p => !used.has(p.id)), 2)) {
+        const used2 = new Set([...used, ...m.map(p => p.id)]);
+        for (const l of liberos.filter(p => !used2.has(p.id))) {
+          let ok = true, minW = 9;
+          for (const sit of m) {
+            const act    = m.find(x => x.id !== sit.id);
+            const active = [s, ...h, act, l];
+            const wc     = active.filter(isW).length;
+            if (wc < minWomen) { ok = false; break; }
+            if (wc < minW) minW = wc;
+          }
+          const all7 = [s, ...h, ...m, l];
+          if (all7.filter(isW).length < minWomen) ok = false;
+          if (ok) out.push({ setter: s, hitters: h, middles: m, libero: l,
+            wc: all7.filter(isW).length, tight: minW === minWomen,
+            ids: new Set(all7.map(p => p.id)) });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function _renderTeamsSection(session, attendees) {
+  if (session.type !== 'game') return '';
+  if (!session.askPositions) return '';
+  const withPos = attendees.filter(a => (a.positions || []).length);
+  if (withPos.length < 7) return '';
+
+  const minW     = session.gender === 'men' ? 0 : session.gender === 'women' ? 6 : 2;
+  const lineups  = _buildLineups(attendees, minW);
+  if (!lineups.length) return '';
+
+  const pname = (p, allPlayers) => {
+    const isW = (allPlayers.find(a => a.id === p.id)?.gender === 'woman');
+    return `<span class="tbuilder-pname${isW ? ' w' : ''}">${esc(p.name)}</span>`;
+  };
+
+  const cards = lineups.map((t, i) => {
+    const benchIds = new Set(attendees.filter(a => !t.ids.has(a.id)).map(a => a.id));
+    const bench    = attendees.filter(a => benchIds.has(a.id));
+    return `
+      <div class="tbuilder-card${t.tight ? ' tight' : ''}">
+        <div class="tbuilder-card-header">
+          <span class="tbuilder-num">#${i + 1}</span>
+          <span class="tbuilder-wc">${t.wc}♀</span>
+          ${t.tight ? '<span class="tbuilder-tag">⚠ tight</span>' : ''}
+        </div>
+        <div class="tbuilder-court">
+          <div class="tbuilder-slot"><span class="tbuilder-role">S</span>${pname(t.setter, attendees)}</div>
+          <div class="tbuilder-slot"><span class="tbuilder-role">H</span>${t.hitters.map(p => pname(p, attendees)).join('')}</div>
+          <div class="tbuilder-slot"><span class="tbuilder-role">M</span>${t.middles.map(p => pname(p, attendees)).join('')}</div>
+          <div class="tbuilder-slot"><span class="tbuilder-role">L</span>${pname(t.libero, attendees)}</div>
+        </div>
+        ${bench.length ? `<div class="tbuilder-bench">
+          <span class="tbuilder-bench-label">Bench</span>
+          ${bench.map(a => `<span class="tbuilder-pname${a.gender === 'woman' ? ' w' : ''}">${esc(a.name)}</span>`).join('')}
+        </div>` : ''}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="detail-section">
+      <div class="detail-section-title">Team combinations <span class="tbuilder-count">${lineups.length}</span></div>
+      <div class="tbuilder-scroll">${cards}</div>
+    </div>`;
+}
+
 function _renderDetail(session, attendees, isAttending, waitingList, myWaitingListPos, content, footer, seriesReg) {
   const knownCount     = _currentUser ? attendees.length : (session.attendeeCount || 0);
   const spotsLeft      = _spotsLeft(session, knownCount);
@@ -1153,6 +1253,8 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
           </div>`).join('')}
       </div>
     </div>` : ''}
+
+    ${_currentUser ? _renderTeamsSection(session, attendees) : ''}
 
     <div class="policy-link-row">
       <button class="policy-link" onclick="openPolicy()">Terms &amp; cancellation policy</button>

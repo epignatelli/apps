@@ -1100,3 +1100,34 @@ body {
 .history-row.clickable-row:hover  { background: rgba(255,255,255,.04); }
 .history-row.clickable-row:active { background: rgba(255,255,255,.08); }
 
+
+/* ── Team builder cards ───────────────────────────────────────────────────── */
+.tbuilder-count { font-size: 11px; font-weight: 600; color: var(--muted);
+                  background: var(--surface2); border-radius: 99px;
+                  padding: 1px 7px; margin-left: 6px; }
+.tbuilder-scroll { display: flex; gap: 10px; overflow-x: auto;
+                   padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.tbuilder-scroll::-webkit-scrollbar { height: 4px; }
+.tbuilder-scroll::-webkit-scrollbar-track { background: transparent; }
+.tbuilder-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+.tbuilder-card { flex: 0 0 200px; scroll-snap-align: start;
+                 background: var(--surface2); border: 1px solid var(--border2);
+                 border-radius: var(--radius); padding: 10px 12px;
+                 display: flex; flex-direction: column; gap: 8px; }
+.tbuilder-card.tight { border-color: rgba(245,166,35,.5); background: rgba(245,166,35,.06); }
+.tbuilder-card-header { display: flex; align-items: center; gap: 6px; }
+.tbuilder-num  { font-size: 11px; color: var(--muted); font-weight: 700; }
+.tbuilder-wc   { font-size: 11px; color: var(--green); font-weight: 700;
+                 background: var(--green-bg); border-radius: 99px; padding: 1px 6px; }
+.tbuilder-tag  { font-size: 10px; color: var(--amber); font-weight: 700; }
+.tbuilder-court { display: flex; flex-direction: column; gap: 5px; }
+.tbuilder-slot { display: flex; align-items: baseline; gap: 6px; }
+.tbuilder-role { font-size: 9px; font-weight: 800; letter-spacing: .08em;
+                 color: var(--muted); text-transform: uppercase; width: 14px;
+                 flex-shrink: 0; }
+.tbuilder-pname { font-size: 13px; font-weight: 500; color: var(--text); }
+.tbuilder-pname.w { color: var(--green); }
+.tbuilder-bench { border-top: 1px solid var(--border2); padding-top: 7px;
+                  display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.tbuilder-bench-label { font-size: 9px; font-weight: 800; letter-spacing: .08em;
+                        text-transform: uppercase; color: var(--muted); width: 100%; }
