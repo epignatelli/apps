@@ -146,11 +146,27 @@ async function _upsertUserDoc(user) {
 
 async function _initMessaging(user) {
   if (!VAPID_KEY || !('serviceWorker' in navigator)) return;
+  // Only proceed if permission is already granted — don't prompt on login.
+  // The prompt is triggered by the user via enablePushNotifications().
+  if (Notification.permission !== 'granted') return;
   try {
-    if (Notification.permission === 'denied') return;
-    const swReg   = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-    const token   = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+    const token = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
     if (token) await _userRef(user.uid).update({ fcmToken: token });
+  } catch (e) {
+    console.log('Push notifications not available:', e.message);
+  }
+}
+
+async function enablePushNotifications() {
+  if (!VAPID_KEY || !('serviceWorker' in navigator)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+    const token = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    if (token && _currentUser) await _userRef(_currentUser.uid).update({ fcmToken: token });
+    showToast('Push notifications enabled.');
   } catch (e) {
     console.log('Push notifications not available:', e.message);
   }
@@ -1895,9 +1911,11 @@ async function openProfileScreen(uid) {
     const doc    = await docRef.get();
     const u      = doc.exists ? { id: doc.id, ...doc.data() } : {};
     const roles  = u.roles || ['player'];
+    const hasOwner           = roles.includes('owner');
+    const hasAdmin           = roles.includes('admin');
     const hasCoach           = roles.includes('coach');
-    const hasPending         = _isOpenRequest(u.coachRequest) && !hasCoach;
     const hasProvider        = roles.includes('provider');
+    const hasPending         = _isOpenRequest(u.coachRequest) && !hasCoach;
     const hasPendingProvider = _isOpenRequest(u.providerRequest) && !hasProvider;
 
     if (isOwn) _setTitle('Your profile');
