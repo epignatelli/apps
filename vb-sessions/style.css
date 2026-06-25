@@ -166,8 +166,8 @@ body {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding: 10px 16px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding: 6px 16px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
 }
 .roots-footer-link { font-size: 11px; color: var(--muted); text-decoration: none; letter-spacing: .06em; text-transform: uppercase; }
 .roots-footer-link:hover { color: var(--text); }
@@ -177,7 +177,7 @@ body {
 /* ─── Filter bar (above footer) ─────────────────────────────────────────── */
 .fbar {
   position: fixed; left: 0; right: 0; z-index: 110;
-  bottom: max(48px, calc(38px + env(safe-area-inset-bottom)));
+  bottom: max(29px, calc(23px + env(safe-area-inset-bottom)));
   display: flex;
   background: rgba(15,17,23,.92);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
