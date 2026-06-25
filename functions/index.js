@@ -19,13 +19,13 @@ const REGION          = 'europe-west2'; // HTTP functions
 const REGION_FIRESTORE = 'europe-west1'; // must match Firestore eur3 multi-region
 
 const APP_ORIGIN = 'https://epignatelli.github.io';
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin':  APP_ORIGIN,
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-function setCors(res) {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
+const ALLOWED_ORIGINS = new Set([APP_ORIGIN, 'http://localhost:8080']);
+function setCors(req, res) {
+  const origin = req.headers.origin || '';
+  res.setHeader('Access-Control-Allow-Origin',  ALLOWED_ORIGINS.has(origin) ? origin : APP_ORIGIN);
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Vary', 'Origin');
 }
 
 async function verifyAuth(req) {
@@ -126,7 +126,7 @@ exports.createCheckoutSession = functions
   .region(REGION)
   .runWith({ secrets: [STRIPE_SECRET_KEY] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -207,7 +207,7 @@ exports.createSeriesCheckoutSession = functions
   .region(REGION)
   .runWith({ secrets: [STRIPE_SECRET_KEY] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -518,7 +518,7 @@ exports.cancelAttendeeAndRefund = functions
   .region(REGION)
   .runWith({ secrets: [STRIPE_SECRET_KEY, GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -609,7 +609,7 @@ exports.dropOutSeries = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -863,7 +863,7 @@ exports.removeAttendeeAdmin = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1025,7 +1025,7 @@ exports.deleteSessionAdmin = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1083,7 +1083,7 @@ exports.joinWaitingList = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1139,7 +1139,7 @@ exports.joinWaitingList = functions
 exports.leaveWaitingList = functions
   .region(REGION)
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1168,7 +1168,7 @@ exports.approveCoachPayment = functions
   .region(REGION)
   .runWith({ secrets: [STRIPE_SECRET_KEY, GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1274,7 +1274,7 @@ exports.messageSessionAttendees = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1335,7 +1335,7 @@ exports.notifyCoachRequest = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1384,7 +1384,7 @@ exports.notifyAdminRequest = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1429,7 +1429,7 @@ exports.notifyProviderRequest = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1480,7 +1480,7 @@ exports.notifyHostRequestOutcome = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1530,7 +1530,7 @@ exports.notifyCoachRequestOutcome = functions
   .region(REGION)
   .runWith({ secrets: [GMAIL_APP_PASSWORD] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1684,7 +1684,7 @@ exports.providerOnboardingLink = functions
   .region(REGION)
   .runWith({ secrets: [STRIPE_SECRET_KEY] })
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1729,7 +1729,7 @@ exports.providerOnboardingLink = functions
 exports.removeUser = functions
   .region(REGION)
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1767,7 +1767,7 @@ exports.removeUser = functions
 exports.updateUserRole = functions
   .region(REGION)
   .https.onRequest(async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
@@ -1775,37 +1775,42 @@ exports.updateUserRole = functions
     try { decoded = await verifyAuth(req); }
     catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
-    const { uid, role, action } = req.body;
-    if (!uid || !role || !['add', 'remove'].includes(action))
-      return res.status(400).json({ error: 'Missing or invalid fields.' });
+    try {
+      const { uid, role, action } = req.body;
+      if (!uid || !role || !['add', 'remove'].includes(action))
+        return res.status(400).json({ error: 'Missing or invalid fields.' });
 
-    const ADMIN_ROLES = ['coach', 'provider'];
-    const OWNER_ROLES = ['admin'];
-    if (![...ADMIN_ROLES, ...OWNER_ROLES].includes(role))
-      return res.status(400).json({ error: 'Invalid role.' });
+      const ADMIN_ROLES = ['coach', 'provider'];
+      const OWNER_ROLES = ['admin'];
+      if (![...ADMIN_ROLES, ...OWNER_ROLES].includes(role))
+        return res.status(400).json({ error: 'Invalid role.' });
 
-    const db = getFirestore();
-    const { isAdmin: callerIsAdmin, isOwner: callerIsOwner } = await _resolveCallerRole(db, decoded);
-    if (!callerIsAdmin) return res.status(403).json({ error: 'Admins only.' });
-    if (OWNER_ROLES.includes(role) && !callerIsOwner)
-      return res.status(403).json({ error: 'Only owners can change admin roles.' });
-    if (uid === decoded.uid)
-      return res.status(400).json({ error: 'Cannot change your own roles.' });
+      const db = getFirestore();
+      const { isAdmin: callerIsAdmin, isOwner: callerIsOwner } = await _resolveCallerRole(db, decoded);
+      if (!callerIsAdmin) return res.status(403).json({ error: 'Admins only.' });
+      if (OWNER_ROLES.includes(role) && !callerIsOwner)
+        return res.status(403).json({ error: 'Only owners can change admin roles.' });
+      if (uid === decoded.uid)
+        return res.status(400).json({ error: 'Cannot change your own roles.' });
 
-    const targetSnap  = await db.collection('users').doc(uid).get();
-    if (!targetSnap.exists) return res.status(404).json({ error: 'User not found.' });
+      const targetSnap  = await db.collection('users').doc(uid).get();
+      if (!targetSnap.exists) return res.status(404).json({ error: 'User not found.' });
 
-    const targetRoles = targetSnap.data()?.roles || ['player'];
-    let newRoles;
-    if (action === 'add') {
-      newRoles = targetRoles.includes(role) ? targetRoles : [...targetRoles, role];
-    } else {
-      newRoles = targetRoles.filter(r => r !== role);
+      const targetRoles = targetSnap.data()?.roles || ['player'];
+      let newRoles;
+      if (action === 'add') {
+        newRoles = targetRoles.includes(role) ? targetRoles : [...targetRoles, role];
+      } else {
+        newRoles = targetRoles.filter(r => r !== role);
+      }
+      if (!newRoles.includes('player')) newRoles.push('player');
+
+      await db.collection('users').doc(uid).update({ roles: newRoles });
+      return res.json({ ok: true, roles: newRoles });
+    } catch(e) {
+      console.error('updateUserRole error:', e);
+      return res.status(500).json({ error: 'Internal error.' });
     }
-    if (!newRoles.includes('player')) newRoles.push('player');
-
-    await db.collection('users').doc(uid).update({ roles: newRoles });
-    return res.json({ ok: true, roles: newRoles });
   });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
