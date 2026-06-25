@@ -19,13 +19,10 @@ const REGION          = 'europe-west2'; // HTTP functions
 const REGION_FIRESTORE = 'europe-west1'; // must match Firestore eur3 multi-region
 
 const APP_ORIGIN = 'https://epignatelli.github.io';
-const ALLOWED_ORIGINS = new Set([APP_ORIGIN, 'http://localhost:8080']);
 function setCors(req, res) {
-  const origin = req.headers.origin || '';
-  res.setHeader('Access-Control-Allow-Origin',  ALLOWED_ORIGINS.has(origin) ? origin : APP_ORIGIN);
+  res.setHeader('Access-Control-Allow-Origin',  APP_ORIGIN);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Vary', 'Origin');
 }
 
 async function verifyAuth(req) {
