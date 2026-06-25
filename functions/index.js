@@ -18,8 +18,9 @@ const GMAIL_APP_PASSWORD    = defineSecret('GMAIL_APP_PASSWORD');
 const REGION          = 'europe-west2'; // HTTP functions
 const REGION_FIRESTORE = 'europe-west1'; // must match Firestore eur3 multi-region
 
+const APP_ORIGIN = 'https://epignatelli.github.io';
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Origin':  APP_ORIGIN,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
@@ -103,11 +104,13 @@ exports.createCheckoutSession = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { sessionId, successUrl, cancelUrl, positions } = req.body;
     if (!sessionId || !successUrl || !cancelUrl)
       return res.status(400).json({ error: 'Missing required fields.' });
+    if (!_validateAppUrl(successUrl) || !_validateAppUrl(cancelUrl))
+      return res.status(400).json({ error: 'Invalid redirect URL.' });
 
     const db  = getFirestore();
     const uid = decoded.uid;
@@ -165,7 +168,7 @@ exports.createCheckoutSession = functions
       });
     } catch (e) {
       console.error('Stripe checkout error:', e.message);
-      return res.status(500).json({ error: `Payment setup failed: ${e.message}` });
+      return res.status(500).json({ error: 'Payment setup failed. Please try again.' });
     }
 
     return res.json({ url: checkout.url });
@@ -182,11 +185,13 @@ exports.createSeriesCheckoutSession = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { seriesId, successUrl, cancelUrl, inviteToken } = req.body;
     if (!seriesId || !successUrl || !cancelUrl)
       return res.status(400).json({ error: 'Missing required fields.' });
+    if (!_validateAppUrl(successUrl) || !_validateAppUrl(cancelUrl))
+      return res.status(400).json({ error: 'Invalid redirect URL.' });
 
     const db  = getFirestore();
     const uid = decoded.uid;
@@ -293,7 +298,7 @@ exports.createSeriesCheckoutSession = functions
       });
     } catch (e) {
       console.error('Stripe series checkout error:', e.message);
-      return res.status(500).json({ error: `Payment setup failed: ${e.message}` });
+      return res.status(500).json({ error: 'Payment setup failed. Please try again.' });
     }
 
     return res.json({ url: checkout.url });
@@ -352,7 +357,7 @@ exports.stripeWebhook = functions
             currency:    'gbp',
             destination: account.id,
             description: `Coach payment — ${session.venue || sessionDoc.id}`,
-          });
+          }, { idempotencyKey: `coach-transfer-${sessionDoc.id}` });
           await sessionDoc.ref.update({
             coachPaymentStatus: 'paid',
             coachPaidAt: FieldValue.serverTimestamp(),
@@ -491,7 +496,7 @@ exports.cancelAttendeeAndRefund = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId.' });
@@ -582,7 +587,7 @@ exports.dropOutSeries = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId.' });
@@ -836,7 +841,7 @@ exports.removeAttendeeAdmin = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const db = getFirestore();
     const [callerDoc, adminDoc] = await Promise.all([
@@ -985,7 +990,7 @@ exports.deleteSessionAdmin = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const db = getFirestore();
     const [callerDoc, adminDoc] = await Promise.all([
@@ -1047,7 +1052,7 @@ exports.joinWaitingList = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId.' });
@@ -1103,7 +1108,7 @@ exports.leaveWaitingList = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId.' });
@@ -1132,7 +1137,7 @@ exports.approveCoachPayment = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const db = getFirestore();
     const adminDoc = await db.collection('admins').doc(decoded.email || '').get();
@@ -1238,7 +1243,7 @@ exports.messageSessionAttendees = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const db = getFirestore();
     const [callerDoc, adminDoc] = await Promise.all([
@@ -1290,15 +1295,19 @@ exports.notifyCoachRequest = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
-    const { uid, name } = req.body;
+    // Only the requesting user themselves may trigger this notification
+    const { uid } = req.body;
     if (!uid) return res.status(400).json({ error: 'Missing uid.' });
+    if (decoded.uid !== uid) return res.status(403).json({ error: 'Forbidden.' });
 
     const db         = getFirestore();
+    // Derive name from Firestore, never from client body
+    const userSnap   = await db.collection('users').doc(uid).get();
+    const safeName   = _hEsc(userSnap.data()?.name || uid);
     const adminsSnap = await db.collection('admins').get();
 
-    const safeName = (name || uid || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const { approveUrl, rejectUrl } = await _createRequestTokens(db, uid, 'coach');
     const actionButtons = _requestActionButtons(approveUrl, rejectUrl);
 
@@ -1326,21 +1335,29 @@ exports.notifyAdminRequest = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
-    const { uid, name } = req.body;
+    const { uid } = req.body;
     if (!uid) return res.status(400).json({ error: 'Missing uid.' });
 
     const db          = getFirestore();
+    // Caller must be an admin to nominate someone
+    const callerAdminDoc = await db.collection('admins').doc(decoded.email || '').get();
+    const callerRoles    = (await db.collection('users').doc(decoded.uid).get()).data()?.roles || [];
+    if (!callerAdminDoc.exists && !callerRoles.includes('admin') && !callerRoles.includes('owner'))
+      return res.status(403).json({ error: 'Admins only.' });
+
+    // Derive name from Firestore
+    const targetSnap  = await db.collection('users').doc(uid).get();
+    const safeName    = _hEsc(targetSnap.data()?.name || uid);
+    const nominator   = _hEsc(decoded.email || 'An admin');
+    const appUrl      = 'https://epignatelli.github.io/apps/vb-sessions/#users';
+
     const usersSnap   = await db.collection('users').get();
     const ownerEmails = usersSnap.docs
       .filter(d => (d.data().roles || []).includes('owner'))
       .map(d => d.data().email)
       .filter(Boolean);
-
-    const nominator  = decoded.email || 'An admin';
-    const safeName   = (name || uid || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const appUrl     = 'https://epignatelli.github.io/apps/vb-sessions/#users';
 
     await Promise.all(ownerEmails.map(email =>
       sendEmail(email,
@@ -1366,16 +1383,20 @@ exports.notifyProviderRequest = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
-    const { uid, name } = req.body;
+    const { uid } = req.body;
     if (!uid) return res.status(400).json({ error: 'Missing uid.' });
+    // Only the requesting user themselves may trigger this notification
+    if (decoded.uid !== uid) return res.status(403).json({ error: 'Forbidden.' });
 
     const db         = getFirestore();
+    // Derive name from Firestore, never from client body
+    const userSnap   = await db.collection('users').doc(uid).get();
+    const safeName   = _hEsc(userSnap.data()?.name || uid);
     const adminsSnap = await db.collection('admins').get();
     const appUrl     = 'https://epignatelli.github.io/apps/vb-sessions/#users';
 
-    const safeName = (name || uid || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const { approveUrl, rejectUrl } = await _createRequestTokens(db, uid, 'provider');
     const actionButtons = _requestActionButtons(approveUrl, rejectUrl);
 
@@ -1402,13 +1423,19 @@ exports.notifyHostRequestOutcome = functions
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
-    try { await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    let decoded;
+    try { decoded = await verifyAuth(req); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { uid, approved } = req.body;
     if (!uid) return res.status(400).json({ error: 'Missing uid.' });
 
-    const db       = getFirestore();
+    const db             = getFirestore();
+    const callerAdminDoc = await db.collection('admins').doc(decoded.email || '').get();
+    const callerRoles    = (await db.collection('users').doc(decoded.uid).get()).data()?.roles || [];
+    if (!callerAdminDoc.exists && !callerRoles.includes('admin') && !callerRoles.includes('owner'))
+      return res.status(403).json({ error: 'Admins only.' });
+
     const userSnap = await db.collection('users').doc(uid).get();
     const email    = userSnap.data()?.email;
     const name     = userSnap.data()?.name || 'there';
@@ -1448,13 +1475,19 @@ exports.notifyCoachRequestOutcome = functions
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST')    return res.status(405).end();
 
-    try { await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    let decoded;
+    try { decoded = await verifyAuth(req); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const { uid, approved } = req.body;
     if (!uid) return res.status(400).json({ error: 'Missing uid.' });
 
-    const db       = getFirestore();
+    const db             = getFirestore();
+    const callerAdminDoc = await db.collection('admins').doc(decoded.email || '').get();
+    const callerRoles    = (await db.collection('users').doc(decoded.uid).get()).data()?.roles || [];
+    if (!callerAdminDoc.exists && !callerRoles.includes('admin') && !callerRoles.includes('owner'))
+      return res.status(403).json({ error: 'Admins only.' });
+
     const userSnap = await db.collection('users').doc(uid).get();
     const email    = userSnap.data()?.email;
     const name     = userSnap.data()?.name || 'there';
@@ -1600,7 +1633,7 @@ exports.providerOnboardingLink = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const db       = getFirestore();
     const userSnap = await db.collection('users').doc(decoded.uid).get();
@@ -1645,7 +1678,7 @@ exports.removeUser = functions
 
     let decoded;
     try { decoded = await verifyAuth(req); }
-    catch (e) { return res.status(401).json({ error: e.message }); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
 
     const db         = getFirestore();
     const callerDoc  = await db.collection('users').doc(decoded.uid).get();
@@ -1674,6 +1707,59 @@ exports.removeUser = functions
     return res.json({ ok: true });
   });
 
+// ── updateUserRole ────────────────────────────────────────────────────────────
+// All role writes go through here — never from the client directly.
+// Admins can grant/revoke coach and provider. Owners can also grant/revoke admin.
+// Nobody can grant 'owner' via this endpoint (owner is set manually in Firestore).
+exports.updateUserRole = functions
+  .region(REGION)
+  .https.onRequest(async (req, res) => {
+    setCors(res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method !== 'POST')    return res.status(405).end();
+
+    let decoded;
+    try { decoded = await verifyAuth(req); }
+    catch (e) { return res.status(401).json({ error: 'Unauthorized.' }); }
+
+    const { uid, role, action } = req.body;
+    if (!uid || !role || !['add', 'remove'].includes(action))
+      return res.status(400).json({ error: 'Missing or invalid fields.' });
+
+    const ADMIN_ROLES = ['coach', 'provider'];
+    const OWNER_ROLES = ['admin'];
+    if (![...ADMIN_ROLES, ...OWNER_ROLES].includes(role))
+      return res.status(400).json({ error: 'Invalid role.' });
+
+    const db         = getFirestore();
+    const callerSnap = await db.collection('users').doc(decoded.uid).get();
+    const callerRoles = callerSnap.data()?.roles || [];
+    const callerIsOwner = callerRoles.includes('owner');
+    const callerIsAdmin = callerIsOwner || callerRoles.includes('admin')
+      || (await db.collection('admins').doc(decoded.email || '').get()).exists;
+
+    if (!callerIsAdmin) return res.status(403).json({ error: 'Admins only.' });
+    if (OWNER_ROLES.includes(role) && !callerIsOwner)
+      return res.status(403).json({ error: 'Only owners can change admin roles.' });
+    if (uid === decoded.uid)
+      return res.status(400).json({ error: 'Cannot change your own roles.' });
+
+    const targetSnap  = await db.collection('users').doc(uid).get();
+    if (!targetSnap.exists) return res.status(404).json({ error: 'User not found.' });
+
+    const targetRoles = targetSnap.data()?.roles || ['player'];
+    let newRoles;
+    if (action === 'add') {
+      newRoles = targetRoles.includes(role) ? targetRoles : [...targetRoles, role];
+    } else {
+      newRoles = targetRoles.filter(r => r !== role);
+    }
+    if (!newRoles.includes('player')) newRoles.push('player');
+
+    await db.collection('users').doc(uid).update({ roles: newRoles });
+    return res.json({ ok: true, roles: newRoles });
+  });
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function _playerPrice(adminPrice) {
   if (!adminPrice || adminPrice <= 0) return 0;
@@ -1699,6 +1785,16 @@ function _calendarUrl(session) {
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&location=${loc}`;
 }
 
+function _hEsc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _validateAppUrl(url) {
+  return typeof url === 'string' && url.startsWith(APP_ORIGIN + '/');
+}
+
 function _emailHtml(greeting, paragraphs, calendarUrl = null, ctaUrl = null, ctaLabel = null, actionsHtml = '') {
   const body = paragraphs.map(p => `<p style="margin:0 0 12px">${p}</p>`).join('');
   const cal  = calendarUrl
@@ -1709,7 +1805,7 @@ function _emailHtml(greeting, paragraphs, calendarUrl = null, ctaUrl = null, cta
     : '';
   const policyUrl = 'https://epignatelli.github.io/volleyball-teams-maker/vb-sessions/';
   return `<!DOCTYPE html><html><body style="font-family:sans-serif;color:#111;max-width:480px;margin:0 auto;padding:24px">
-<p style="margin:0 0 12px">${greeting}</p>
+<p style="margin:0 0 12px">${_hEsc(greeting)}</p>
 ${body}${actionsHtml}${cal}${cta}
 <p style="margin:24px 0 0;font-size:12px;color:#888">Roots Volleyball · <a href="${policyUrl}" style="color:#888">Terms &amp; cancellation policy</a></p>
 </body></html>`;

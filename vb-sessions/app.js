@@ -335,8 +335,21 @@ function _fsGet(ref) {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// Validate user-supplied URLs — only allow http/https to prevent javascript: injection
+function safeUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? url : null;
+  } catch { return null; }
+}
+
+// Map of uid → display name, populated when rendering user cards.
+// Used to avoid embedding names in onclick JS string literals.
+const _userDisplayNames = {};
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -509,9 +522,9 @@ async function _loadHostFilterPills() {
     const hosts = snap.docs.map(d => ({ uid: d.id, name: d.data().name || d.id }));
     const cur = _activeProviderFilter || '';
     container.innerHTML =
-      `<button class="fpop-opt${cur === '' ? ' active' : ''}" data-host="" onclick="setHostFilter('')">All</button>` +
+      `<button class="fpop-opt${cur === '' ? ' active' : ''}" data-host="" onclick="setHostFilter(this.dataset.host, '')">All</button>` +
       hosts.map(h =>
-        `<button class="fpop-opt${cur === h.uid ? ' active' : ''}" data-host="${esc(h.uid)}" onclick="setHostFilter('${esc(h.uid)}','${esc(h.name)}')">${esc(h.name)}</button>`
+        `<button class="fpop-opt${cur === h.uid ? ' active' : ''}" data-host="${esc(h.uid)}" data-name="${esc(h.name)}" onclick="setHostFilter(this.dataset.host, this.dataset.name)">${esc(h.name)}</button>`
       ).join('');
   } catch(e) { console.error('Load hosts failed:', e); }
 }
@@ -932,7 +945,8 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
           const v = session.venueId ? _allVenues.find(x => x.id === session.venueId) : null;
           const name = esc(session.venue);
           const addr = v?.address ? ` <span class="venue-address">${esc(v.address)}</span>` : '';
-          const link = v?.mapsUrl ? ` <a class="venue-maps-link" href="${esc(v.mapsUrl)}" target="_blank" rel="noopener">Map ↗</a>` : '';
+          const _mapsUrl = safeUrl(v?.mapsUrl);
+          const link = _mapsUrl ? ` <a class="venue-maps-link" href="${esc(_mapsUrl)}" target="_blank" rel="noopener">Map ↗</a>` : '';
           return name + addr + link;
         })()}</span></div>` : ''}
         <div class="detail-meta-row"><span class="detail-meta-label">Date</span><span>${esc(_formatDate(session.date))}${session.time ? ` at ${esc(session.time)}` : ''}</span></div>
@@ -1445,6 +1459,7 @@ function _applyUserFilter() {
 }
 
 function _renderUserRow(u) {
+  _userDisplayNames[u.id] = u.name || u.email || u.id; // populate lookup map
   const roles           = u.roles || ['player'];
   const isMe            = _currentUser && u.id === _currentUser.uid;
   const hasOwner           = roles.includes('owner');
@@ -1473,24 +1488,24 @@ function _renderUserRow(u) {
   let actions = '';
   if (_isAdmin) {
     if (hasPendingCoach) {
-      actions += `<button class="role-toggle active coach" onclick="approveCoach('${u.id}','${safeName}')">Approve coach</button>
-                  <button class="role-toggle" onclick="rejectCoach('${u.id}')">Reject</button>`;
+      actions += `<button class="role-toggle active coach" data-uid="${esc(u.id)}" onclick="approveCoach(this.dataset.uid)">Approve coach</button>
+                  <button class="role-toggle" data-uid="${esc(u.id)}" onclick="rejectCoach(this.dataset.uid)">Reject</button>`;
     } else if (hasPendingProvider) {
-      actions += `<button class="role-toggle active provider" onclick="approveProvider('${u.id}','${safeName}')">Approve host</button>
-                  <button class="role-toggle" onclick="rejectProvider('${u.id}')">Reject</button>`;
+      actions += `<button class="role-toggle active provider" data-uid="${esc(u.id)}" onclick="approveProvider(this.dataset.uid)">Approve host</button>
+                  <button class="role-toggle" data-uid="${esc(u.id)}" onclick="rejectProvider(this.dataset.uid)">Reject</button>`;
     } else if (hasPendingAdmin) {
       actions += _isOwner
-        ? `<button class="role-toggle active admin" onclick="approveAdmin('${u.id}','${safeName}')">Approve admin</button>
-           <button class="role-toggle" onclick="rejectAdmin('${u.id}')">Reject</button>`
+        ? `<button class="role-toggle active admin" data-uid="${esc(u.id)}" onclick="approveAdmin(this.dataset.uid)">Approve admin</button>
+           <button class="role-toggle" data-uid="${esc(u.id)}" onclick="rejectAdmin(this.dataset.uid)">Reject</button>`
         : `<span class="role-toggle active admin" style="cursor:default">Admin pending</span>`;
     } else {
-      if (canManageOwner)    actions += `<button class="role-toggle${hasOwner ? ' active owner' : ''}" onclick="toggleRole('${u.id}','owner','${safeName}')">Owner</button>`;
-      if (canManageAdmin)    actions += `<button class="role-toggle${hasAdmin ? ' active admin' : ''}" onclick="toggleRole('${u.id}','admin','${safeName}')">Admin</button>`;
-      if (canManageCoach)    actions += `<button class="role-toggle${hasCoach ? ' active coach' : ''}" onclick="toggleRole('${u.id}','coach','${safeName}')">Coach</button>`;
-      if (canManageProvider) actions += `<button class="role-toggle${hasProvider ? ' active provider' : ''}" onclick="toggleRole('${u.id}','provider','${safeName}')">Host</button>`;
-      if (canNominate)       actions += `<button class="role-toggle" onclick="nominateForAdmin('${u.id}','${safeName}')">Nominate admin</button>`;
+      if (canManageOwner)    actions += `<button class="role-toggle${hasOwner ? ' active owner' : ''}" data-uid="${esc(u.id)}" data-role="owner" onclick="toggleRole(this.dataset.uid,this.dataset.role)">Owner</button>`;
+      if (canManageAdmin)    actions += `<button class="role-toggle${hasAdmin ? ' active admin' : ''}" data-uid="${esc(u.id)}" data-role="admin" onclick="toggleRole(this.dataset.uid,this.dataset.role)">Admin</button>`;
+      if (canManageCoach)    actions += `<button class="role-toggle${hasCoach ? ' active coach' : ''}" data-uid="${esc(u.id)}" data-role="coach" onclick="toggleRole(this.dataset.uid,this.dataset.role)">Coach</button>`;
+      if (canManageProvider) actions += `<button class="role-toggle${hasProvider ? ' active provider' : ''}" data-uid="${esc(u.id)}" data-role="provider" onclick="toggleRole(this.dataset.uid,this.dataset.role)">Host</button>`;
+      if (canNominate)       actions += `<button class="role-toggle" data-uid="${esc(u.id)}" onclick="nominateForAdmin(this.dataset.uid)">Nominate admin</button>`;
     }
-    if (canRemove) actions += `<button class="role-toggle danger" onclick="banUser('${u.id}','${safeName}')">Remove</button>`;
+    if (canRemove) actions += `<button class="role-toggle danger" data-uid="${esc(u.id)}" onclick="banUser(this.dataset.uid)">Remove</button>`;
   }
 
   return `
@@ -1513,7 +1528,7 @@ function _renderUserRow(u) {
     </div>`;
 }
 
-async function toggleRole(uid, role, displayName) {
+async function toggleRole(uid, role) {
   if (!_isAdmin) return;
   if ((role === 'admin' || role === 'owner') && !_isOwner) {
     showToast('Only owners can change admin or owner roles.', 'error');
@@ -1523,13 +1538,10 @@ async function toggleRole(uid, role, displayName) {
     const doc      = await _userRef(uid).get();
     const roles    = doc.data()?.roles || ['player'];
     const isAdding = !roles.includes(role);
-    const label    = displayName || uid;
-    const verb     = isAdding ? 'grant' : 'remove';
+    const label    = _userDisplayNames[uid] || uid;
     const roleStr  = role.charAt(0).toUpperCase() + role.slice(1);
-    if (!confirm(`${verb === 'grant' ? 'Grant' : 'Remove'} ${roleStr} role ${verb === 'grant' ? 'to' : 'from'} ${label}?`)) return;
-    const newRoles = isAdding ? [...roles, role] : roles.filter(r => r !== role);
-    if (!newRoles.includes('player')) newRoles.push('player');
-    await _userRef(uid).set({ roles: newRoles }, { merge: true });
+    if (!confirm(`${isAdding ? 'Grant' : 'Remove'} ${roleStr} role ${isAdding ? 'to' : 'from'} ${label}?`)) return;
+    await callFn('updateUserRole', { uid, role, action: isAdding ? 'add' : 'remove' });
     renderUsers();
   } catch(e) {
     console.error('Toggle role failed:', e);
@@ -1539,9 +1551,9 @@ async function toggleRole(uid, role, displayName) {
   }
 }
 
-async function nominateForAdmin(uid, displayName) {
+async function nominateForAdmin(uid) {
   if (!_isAdmin) return;
-  const label = displayName || uid;
+  const label = _userDisplayNames[uid] || uid;
   if (!confirm(`Nominate ${label} for Admin? An owner will be asked to approve.`)) return;
   try {
     await _userRef(uid).update({ adminRequest: true });
@@ -1553,15 +1565,13 @@ async function nominateForAdmin(uid, displayName) {
   }
 }
 
-async function approveAdmin(uid, displayName) {
+async function approveAdmin(uid) {
   if (!_isOwner) return;
-  const label = displayName || uid;
+  const label = _userDisplayNames[uid] || uid;
   if (!confirm(`Approve ${label} as Admin?`)) return;
   try {
-    const doc   = await _userRef(uid).get();
-    const roles = doc.data()?.roles || ['player'];
-    if (!roles.includes('admin')) roles.push('admin');
-    await _userRef(uid).update({ roles, adminRequest: false });
+    await callFn('updateUserRole', { uid, role: 'admin', action: 'add' });
+    await _userRef(uid).update({ adminRequest: false });
     showToast('Admin approved.');
     renderUsers();
   } catch(e) { showToast('Couldn\'t approve. Try again.', 'error'); }
@@ -1583,17 +1593,16 @@ function _refreshAfterRoleAction(uid) {
   else renderUsers();
 }
 
-async function approveCoach(uid, displayName) {
+async function approveCoach(uid) {
   if (!_isAdmin) return;
-  const label = displayName || uid;
+  const label = _userDisplayNames[uid] || uid;
   if (!confirm(`Approve ${label} as Coach?`)) return;
   try {
     const doc  = await _userRef(uid).get();
     const data = doc.data() || {};
     if (!_isOpenRequest(data.coachRequest)) { showToast('Request is no longer open.', 'error'); return; }
-    const roles = data.roles || ['player'];
-    if (!roles.includes('coach')) roles.push('coach');
-    await _userRef(uid).update({ roles, coachRequest: { ...data.coachRequest, ..._requestClosed('approved') } });
+    await callFn('updateUserRole', { uid, role: 'coach', action: 'add' });
+    await _userRef(uid).update({ coachRequest: { ...data.coachRequest, ..._requestClosed('approved') } });
     callFn('notifyCoachRequestOutcome', { uid, approved: true }).catch(console.error);
     showToast('Coach approved.');
     _refreshAfterRoleAction(uid);
@@ -1614,17 +1623,16 @@ async function rejectCoach(uid) {
   } catch(e) { showToast('Couldn\'t reject. Try again.', 'error'); }
 }
 
-async function approveProvider(uid, displayName) {
+async function approveProvider(uid) {
   if (!_isAdmin) return;
-  const label = displayName || uid;
+  const label = _userDisplayNames[uid] || uid;
   if (!confirm(`Approve ${label} as a host?`)) return;
   try {
     const doc  = await _userRef(uid).get();
     const data = doc.data() || {};
     if (!_isOpenRequest(data.providerRequest)) { showToast('Request is no longer open.', 'error'); return; }
-    const roles = data.roles || ['player'];
-    if (!roles.includes('provider')) roles.push('provider');
-    await _userRef(uid).update({ roles, providerRequest: { ...data.providerRequest, ..._requestClosed('approved') } });
+    await callFn('updateUserRole', { uid, role: 'provider', action: 'add' });
+    await _userRef(uid).update({ providerRequest: { ...data.providerRequest, ..._requestClosed('approved') } });
     callFn('notifyHostRequestOutcome', { uid, approved: true }).catch(console.error);
     showToast('Host approved.');
     _refreshAfterRoleAction(uid);
@@ -1645,9 +1653,10 @@ async function rejectProvider(uid) {
   } catch(e) { showToast('Couldn\'t reject. Try again.', 'error'); }
 }
 
-async function banUser(uid, name) {
+async function banUser(uid) {
   if (!_isAdmin) return;
-  if (!confirm(`Remove ${name || 'this user'}? This will permanently delete their account.`)) return;
+  const name = _userDisplayNames[uid] || 'this user';
+  if (!confirm(`Remove ${name}? This will permanently delete their account.`)) return;
   try {
     await callFn('removeUser', { uid });
     showToast('User removed.');
@@ -1759,16 +1768,16 @@ async function openProfileScreen(uid) {
             <span class="role-status-name">Coach</span>
             ${hasCoach ? _activeTag : hasPending ? `
               <div class="role-action-btns">
-                <button class="role-action-approve" onclick="approveCoach('${safeUid}','${safeName}')">Approve</button>
-                <button class="role-action-reject" onclick="rejectCoach('${safeUid}')">Reject</button>
+                <button class="role-action-approve" data-uid="${esc(u.id)}" onclick="approveCoach(this.dataset.uid)">Approve</button>
+                <button class="role-action-reject" data-uid="${esc(u.id)}" onclick="rejectCoach(this.dataset.uid)">Reject</button>
               </div>` : `<span class="role-status-locked">Not requested</span>`}
           </div>
           <div class="role-status-row">
             <span class="role-status-name">Host</span>
             ${hasProvider ? _activeTag : hasPendingProvider ? `
               <div class="role-action-btns">
-                <button class="role-action-approve" onclick="approveProvider('${safeUid}','${safeName}')">Approve</button>
-                <button class="role-action-reject" onclick="rejectProvider('${safeUid}')">Reject</button>
+                <button class="role-action-approve" data-uid="${esc(u.id)}" onclick="approveProvider(this.dataset.uid)">Approve</button>
+                <button class="role-action-reject" data-uid="${esc(u.id)}" onclick="rejectProvider(this.dataset.uid)">Reject</button>
               </div>` : `<span class="role-status-locked">Not requested</span>`}
           </div>
           <div class="role-status-row">
@@ -3935,7 +3944,7 @@ async function openSeriesDetail(seriesId) {
         </div>
       </div>
       <div class="detail-section">
-        <button class="cta-btn secondary-btn" onclick="openSeriesSessions('${esc(seriesId)}', '${esc(series.name)}')">View sessions →</button>
+        <button class="cta-btn secondary-btn" data-sid="${esc(seriesId)}" data-sname="${esc(series.name)}" onclick="openSeriesSessions(this.dataset.sid, this.dataset.sname)">View sessions →</button>
       </div>`;
   } catch(e) {
     console.error('Load series detail failed:', e);
