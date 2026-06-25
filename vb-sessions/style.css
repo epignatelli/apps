@@ -3,6 +3,7 @@
 button, input, select, textarea { touch-action: manipulation; font-family: inherit; }
 
 :root {
+  --footer-h: 28px;
   --bg:        #0f1117;
   --surface:   #1a1d27;
   --surface2:  #22263a;
@@ -163,11 +164,11 @@ body {
 /* ─── Persistent footer (bottom) ────────────────────────────────────────── */
 .roots-footer {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 95;
+  height: calc(var(--footer-h) + env(safe-area-inset-bottom));
   display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 0 16px;
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding: 6px 16px;
-  padding-bottom: max(6px, env(safe-area-inset-bottom));
 }
 .roots-footer-link { font-size: 11px; color: var(--muted); text-decoration: none; letter-spacing: .06em; text-transform: uppercase; }
 .roots-footer-link:hover { color: var(--text); }
@@ -177,7 +178,7 @@ body {
 /* ─── Filter bar (above footer) ─────────────────────────────────────────── */
 .fbar {
   position: fixed; left: 0; right: 0; z-index: 110;
-  bottom: max(34px, calc(28px + env(safe-area-inset-bottom)));
+  bottom: calc(var(--footer-h) + env(safe-area-inset-bottom));
   display: flex;
   background: rgba(15,17,23,.92);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
