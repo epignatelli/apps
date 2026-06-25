@@ -858,7 +858,7 @@ function _renderSessionCard(s) {
   const timeStr     = s.time || '';
   const costStr     = _formatPlayerPrice(s.cost, s.absorbFee);
   const countStr    = s.attendeeCount != null ? `${s.attendeeCount}/${s.maxPlayers}` : `0/${s.maxPlayers}`;
-  const levelLabel  = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[s.level] || '';
+  const levelLabel  = { any: 'Any level', beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[s.level] || 'Any level';
   const typeLabel   = SESSION_TYPES.find(t => t.value === s.type)?.label || '';
   const genderLabel = SESSION_GENDERS.find(g => g.value === s.gender)?.label || '';
   return `
@@ -870,7 +870,7 @@ function _renderSessionCard(s) {
       </div>
       <div class="session-card-meta">
         <span class="session-badge ${statusClass}">${statusLabel}</span>
-        ${levelLabel   ? `<span class="session-badge level level-${esc(s.level)}">${esc(levelLabel)}</span>` : ''}
+        <span class="session-badge level level-${esc(s.level || 'any')}">${esc(levelLabel)}</span>
         ${typeLabel    ? `<span class="session-badge type-${esc(s.type)}">${esc(typeLabel)}</span>` : ''}
         ${genderLabel  ? `<span class="session-badge gender-${esc(s.gender)}">${esc(genderLabel)}</span>` : ''}
         ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
