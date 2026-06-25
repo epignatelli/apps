@@ -1042,8 +1042,8 @@ body {
 
 /* Series pass badge (confirmed member) */
 .session-badge.series-pass-badge {
-  background: rgba(74,222,128,.12);
-  color: #4ade80;
+  background: rgba(20,184,166,.15);
+  color: #2dd4bf;
 }
 
 /* "S" chip on attendee rows for series members */
