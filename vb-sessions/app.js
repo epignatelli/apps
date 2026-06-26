@@ -3118,6 +3118,7 @@ async function openSessionEditInline(sessionId) {
   const s = _currentSession;
   if (!s || s.id !== sessionId) { await openSession(sessionId); return; }
   if (!_allVenues.length) await _loadVenues();
+  if (!_allSeries.length) await _loadSeries();
 
   const content = document.getElementById('detail-content');
   const footer  = document.getElementById('detail-footer');
@@ -3132,32 +3133,31 @@ async function openSessionEditInline(sessionId) {
   const venueOpts = _allVenues.map(v =>
     `<option value="${v.id}"${v.id === s.venueId ? ' selected' : ''}>${esc(v.name)}</option>`
   ).join('');
+  const seriesOpts = '<option value="">None</option>' + _allSeries.map(sr =>
+    `<option value="${sr.id}"${sr.id === s.seriesId ? ' selected' : ''}>${esc(sr.name)}</option>`
+  ).join('');
   const levelOpts = [['','Any level'],['beginner','Beginner'],['intermediate','Intermediate'],['advanced','Advanced'],['competitive','Competitive']]
     .map(([v,l]) => `<option value="${v}"${(s.level||'')===v?' selected':''}>${l}</option>`).join('');
   const typeOpts  = SESSION_TYPES.map(t =>
     `<option value="${t.value}"${(s.type||'game')===t.value?' selected':''}>${t.label}</option>`).join('');
   const genderOpts = SESSION_GENDERS.map(g =>
     `<option value="${g.value}"${(s.gender||'mixed')===g.value?' selected':''}>${g.label}</option>`).join('');
-  const statusOpts = [['open','Open'],['cancelled','Cancelled'],['ended','Ended']]
+  const statusOpts = [['open','Open'],['cancelled','Cancelled']]
     .map(([v,l]) => `<option value="${v}"${(s.status||'open')===v?' selected':''}>${l}</option>`).join('');
 
   const pt = s.positionTargets || {};
   const hasPos = !!s.askPositions;
 
   content.innerHTML = `
-    <div style="padding:16px 20px 80px;display:flex;flex-direction:column;gap:14px">
-      <div class="field">
-        <label class="field-label">Date</label>
-        <input class="field-input" type="date" id="ie-date" value="${dateVal}" />
-      </div>
+    <div class="form-fields" style="padding-bottom:80px">
       <div class="field-row">
+        <div class="field">
+          <label class="field-label">Date</label>
+          <input class="field-input" type="date" id="ie-date" value="${dateVal}" />
+        </div>
         <div class="field">
           <label class="field-label">Time</label>
           <input class="field-input" type="time" id="ie-time" value="${esc(s.time||'')}" />
-        </div>
-        <div class="field">
-          <label class="field-label">Status</label>
-          <select class="field-input field-select" id="ie-status">${statusOpts}</select>
         </div>
       </div>
       <div class="field">
@@ -3175,31 +3175,52 @@ async function openSessionEditInline(sessionId) {
         </div>
       </div>
       <div class="field">
+        <label class="field-label">Pass <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— optional</span></label>
+        <select class="field-input field-select" id="ie-series">${seriesOpts}</select>
+      </div>
+      <div class="field">
+        <label class="field-label">Description</label>
+        <textarea class="field-input field-textarea" id="ie-description" placeholder="What to expect, skill level, what to bring…" maxlength="400">${esc(s.description||'')}</textarea>
+      </div>
+      ${_isAdmin ? `
+      <div class="field-row" id="ie-coach-field">
+        <div class="field">
+          <label class="field-label">Coach</label>
+          <select class="field-input field-select" id="ie-coach-select" onchange="_ieOnCoachChange()">
+            <option value="">None</option>
+          </select>
+          <input class="field-input" type="text" id="ie-coach-custom" placeholder="Coach name"
+            maxlength="60" autocomplete="off" autocorrect="off" spellcheck="false"
+            style="display:none;margin-top:6px" />
+        </div>
+        <div class="field">
+          <label class="field-label">Level</label>
+          <select class="field-input field-select" id="ie-level">${levelOpts}</select>
+        </div>
+      </div>` : `
+      <div class="field">
         <label class="field-label">Level</label>
         <select class="field-input field-select" id="ie-level">${levelOpts}</select>
-      </div>
+      </div>`}
       <div class="field-row">
         <div class="field">
           <label class="field-label">Max players</label>
-          <input class="field-input" type="number" id="ie-max" min="1" max="100" inputmode="numeric" value="${s.maxPlayers||''}" />
+          <input class="field-input" type="number" id="ie-max" min="1" max="100" inputmode="numeric" placeholder="12" value="${s.maxPlayers||''}" />
         </div>
         <div class="field">
           <label class="field-label">Cost (£)</label>
-          <input class="field-input" type="number" id="ie-cost" min="0" step="0.5" inputmode="decimal" value="${s.cost!=null?s.cost:''}" />
+          <input class="field-input" type="number" id="ie-cost" min="0" step="0.5" inputmode="decimal" placeholder="0" value="${s.cost!=null?s.cost:''}"/>
+          ${_isAdmin ? `<label class="toggle-row" style="margin-top:6px">
+            <input type="checkbox" id="ie-absorb-fee"${s.absorbFee?' checked':''} />
+            <span class="toggle-label-text">Waive booking fee</span>
+          </label>` : ''}
         </div>
       </div>
       ${_isAdmin ? `
-      <div class="field-row">
-        <div class="field">
-          <label class="field-label">Coach fee (£)</label>
-          <input class="field-input" type="number" id="ie-coach-fee" min="0" step="0.5" inputmode="decimal" value="${s.coachFee!=null?s.coachFee:''}" />
-        </div>
-        <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
-          <label class="toggle-row">
-            <input type="checkbox" id="ie-absorb-fee"${s.absorbFee?' checked':''} />
-            <span class="toggle-label-text">Waive booking fee</span>
-          </label>
-        </div>
+      <div class="field">
+        <label class="field-label">Coach fee (£)</label>
+        <input class="field-input" type="number" id="ie-coach-fee" min="0" step="0.5" inputmode="decimal" placeholder="50" value="${s.coachFee!=null?s.coachFee:''}" />
+        <div class="field-hint">Amount paid to the coach after the session closes.</div>
       </div>` : ''}
       <div class="field">
         <label class="field-label">Registration deadline</label>
@@ -3208,31 +3229,71 @@ async function openSessionEditInline(sessionId) {
       <div class="field">
         <label class="toggle-row">
           <input type="checkbox" id="ie-ask-positions"${hasPos?' checked':''}
-            onchange="document.getElementById('ie-pos-targets').style.display=this.checked?'flex':'none'" />
-          <span class="toggle-label-text">Ask players for their position</span>
+            onchange="document.getElementById('ie-pos-targets-field').style.display=this.checked?'':'none'" />
+          <span class="toggle-label-text">Ask players for their position when registering</span>
         </label>
       </div>
-      <div id="ie-pos-targets" style="display:${hasPos?'flex':'none'};flex-direction:column;gap:8px">
-        <div class="field-row">
-          ${['setter','hitter'].map(p=>`<div class="field"><label class="field-label" style="text-transform:capitalize">${p}</label>
-            <input class="field-input" type="number" id="ie-target-${p}" min="0" inputmode="numeric" value="${pt[p]||''}" placeholder="0"/></div>`).join('')}
-        </div>
-        <div class="field-row">
-          ${['middle','libero'].map(p=>`<div class="field"><label class="field-label" style="text-transform:capitalize">${p}</label>
-            <input class="field-input" type="number" id="ie-target-${p}" min="0" inputmode="numeric" value="${pt[p]||''}" placeholder="0"/></div>`).join('')}
+      <div class="field" id="ie-pos-targets-field" style="display:${hasPos?'':'none'}">
+        <label class="field-label">Position targets <span class="field-hint">— leave blank for no limit</span></label>
+        <div class="pos-targets-row">
+          <label class="pos-target-item"><span class="pos-target-label">Setter</span><input class="field-input pos-target-input" type="number" id="ie-target-setter" min="0" max="99" placeholder="–" value="${pt.setter||''}"/></label>
+          <label class="pos-target-item"><span class="pos-target-label">Hitter</span><input class="field-input pos-target-input" type="number" id="ie-target-hitter" min="0" max="99" placeholder="–" value="${pt.hitter||''}"/></label>
+          <label class="pos-target-item"><span class="pos-target-label">Middle</span><input class="field-input pos-target-input" type="number" id="ie-target-middle" min="0" max="99" placeholder="–" value="${pt.middle||''}"/></label>
+          <label class="pos-target-item"><span class="pos-target-label">Libero</span><input class="field-input pos-target-input" type="number" id="ie-target-libero" min="0" max="99" placeholder="–" value="${pt.libero||''}"/></label>
         </div>
       </div>
+      ${_isAdmin ? `
       <div class="field">
-        <label class="field-label">Description</label>
-        <textarea class="field-input field-textarea" id="ie-description" maxlength="400">${esc(s.description||'')}</textarea>
-      </div>
-      <div id="ie-error" style="color:var(--red,#e05555);font-size:13px;min-height:16px"></div>
+        <label class="field-label">Status</label>
+        <select class="field-input field-select" id="ie-status">${statusOpts}</select>
+      </div>` : ''}
+      <div class="form-error" id="ie-error"></div>
     </div>`;
 
   footer.innerHTML = `
     <button class="cta-btn secondary-btn" onclick="openSession('${sessionId}')">Cancel</button>
     <button class="cta-btn" id="ie-save-btn" onclick="_submitInlineEdit('${sessionId}')">Save changes</button>`;
+
+  // Load coaches async after HTML is in DOM
+  if (_isAdmin) await _ieLoadCoachOptions(s.coach, s.coachUid);
 }
+
+async function _ieLoadCoachOptions(currentCoach, currentCoachUid) {
+  const sel    = document.getElementById('ie-coach-select');
+  const custom = document.getElementById('ie-coach-custom');
+  if (!sel) return;
+  try {
+    const snap = await _usersRef().where('roles', 'array-contains', 'coach').get();
+    snap.docs.forEach(d => {
+      const name = d.data().name || d.data().email || '';
+      if (!name) return;
+      const opt = document.createElement('option');
+      opt.value = d.id; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.error('Failed to load coaches:', e); }
+  const customOpt = document.createElement('option');
+  customOpt.value = '__custom__'; customOpt.textContent = 'Custom…';
+  sel.appendChild(customOpt);
+
+  if (currentCoachUid && Array.from(sel.options).find(o => o.value === currentCoachUid)) {
+    sel.value = currentCoachUid;
+    custom.style.display = 'none'; custom.value = '';
+  } else if (currentCoach) {
+    sel.value = '__custom__';
+    custom.style.display = ''; custom.value = currentCoach;
+  } else {
+    sel.value = ''; custom.style.display = 'none'; custom.value = '';
+  }
+}
+
+window._ieOnCoachChange = function() {
+  const sel    = document.getElementById('ie-coach-select');
+  const custom = document.getElementById('ie-coach-custom');
+  const isCustom = sel.value === '__custom__';
+  custom.style.display = isCustom ? '' : 'none';
+  if (isCustom) custom.focus();
+};
 
 window._submitInlineEdit = async function(sessionId) {
   const errorEl = document.getElementById('ie-error');
@@ -3256,6 +3317,17 @@ window._submitInlineEdit = async function(sessionId) {
   const coachFee    = coachFeeEl ? (parseFloat(coachFeeEl.value) || 0) : (_currentSession?.coachFee || 0);
   const askPos      = document.getElementById('ie-ask-positions').checked;
   const deadlineStr = document.getElementById('ie-deadline').value;
+  const seriesSelEl = document.getElementById('ie-series');
+  const seriesIdVal = seriesSelEl?.value || '';
+  const seriesObj   = _allSeries.find(sr => sr.id === seriesIdVal);
+
+  const coachSel    = _isAdmin ? (document.getElementById('ie-coach-select')?.value || '') : '';
+  const coachUidVal = _isAdmin && coachSel && coachSel !== '__custom__' ? coachSel : '';
+  const coachVal    = _isAdmin
+    ? (coachSel === '__custom__'
+        ? (document.getElementById('ie-coach-custom')?.value.trim() || '')
+        : (coachSel ? (document.querySelector(`#ie-coach-select option[value="${coachSel}"]`)?.textContent || '') : ''))
+    : '';
 
   const posTargets = (() => {
     if (!askPos) return null;
@@ -3272,6 +3344,8 @@ window._submitInlineEdit = async function(sessionId) {
     time:                 document.getElementById('ie-time').value,
     venue:                venueObj?.name || '',
     venueId,
+    coach:                coachVal,
+    coachUid:             coachUidVal,
     level:                document.getElementById('ie-level').value,
     type:                 document.getElementById('ie-type').value,
     gender:               document.getElementById('ie-gender').value,
@@ -3281,9 +3355,11 @@ window._submitInlineEdit = async function(sessionId) {
     coachFee,
     absorbFee,
     playerPrice:          absorbFee ? costVal : _playerPrice(costVal),
-    status:               document.getElementById('ie-status').value,
+    status:               _isAdmin ? (document.getElementById('ie-status')?.value || 'open') : (_currentSession?.status || 'open'),
     askPositions:         askPos,
     positionTargets:      posTargets,
+    seriesId:             seriesIdVal || null,
+    seriesName:           seriesObj?.name || '',
     registrationDeadline: deadlineStr
       ? firebase.firestore.Timestamp.fromDate(new Date(deadlineStr))
       : null,
