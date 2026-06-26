@@ -2853,9 +2853,9 @@ function onCoachSelectChange() {
 }
 
 function openSessionForm(id = null) {
-  if (!id && !_isProvider) return;                         // creating: providers only
+  if (!id && !_canCreate()) return;                         // creating: admins + onboarded providers
   if (id && !_isAdmin && !_isProvider) return;             // editing: admin or provider
-  if (!id && !_providerOnboardingComplete) {
+  if (!id && !_isAdmin && !_providerOnboardingComplete) {
     showToast('Set up payments in your profile before creating sessions.', 'error');
     return;
   }
@@ -4808,10 +4808,10 @@ async function openSeriesSessions(seriesId, seriesName) {
 // ── Series form ──
 
 function openSeriesForm(id) {
-  if (!id && !_isProvider) return;                         // creating: providers only
+  if (!id && !_canCreate()) return;                         // creating: admins + onboarded providers
   if (id && !_isAdmin && !_isProvider) return;             // editing: admin or provider
-  if (!id && !_providerOnboardingComplete) {
-    showToast('Set up payments in your profile before creating series.', 'error');
+  if (!id && !_isAdmin && !_providerOnboardingComplete) {
+    showToast('Set up payments in your profile before creating a pass.', 'error');
     return;
   }
   _editingSeriesId = id || null;
