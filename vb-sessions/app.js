@@ -852,21 +852,37 @@ async function renderHome() {
     const upcoming = sessions.filter(s => s.date?.toDate() >= now);
     const past     = sessions.filter(s => s.date?.toDate() < now).reverse();
 
-    // Group upcoming by date label
-    const dateLabel = ts => {
-      const d = ts?.toDate ? ts.toDate() : new Date(ts);
-      return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    // Group upcoming by week
+    const _weekMonday = d => {
+      const m = new Date(d);
+      m.setHours(0, 0, 0, 0);
+      const day = m.getDay();
+      m.setDate(m.getDate() + (day === 0 ? -6 : 1 - day));
+      return m;
     };
-    const upcomingByDate = [];
+    const _nowMonday   = _weekMonday(now);
+    const _weekLabel   = ts => {
+      const d      = ts?.toDate ? ts.toDate() : new Date(ts);
+      const mon    = _weekMonday(d);
+      const diff   = Math.round((mon - _nowMonday) / 604800000);
+      if (diff === 0) return 'This week';
+      if (diff === 1) return 'Next week';
+      const sun    = new Date(mon); sun.setDate(sun.getDate() + 6);
+      const fmtD   = { day: 'numeric', month: 'short' };
+      if (mon.getMonth() === sun.getMonth())
+        return `${mon.getDate()}–${sun.getDate()} ${sun.toLocaleDateString('en-GB', { month: 'short' })}`;
+      return `${mon.toLocaleDateString('en-GB', fmtD)} – ${sun.toLocaleDateString('en-GB', fmtD)}`;
+    };
+    const upcomingByWeek = [];
     for (const s of upcoming) {
-      const label = dateLabel(s.date);
-      const last  = upcomingByDate[upcomingByDate.length - 1];
+      const label = _weekLabel(s.date);
+      const last  = upcomingByWeek[upcomingByWeek.length - 1];
       if (last && last.label === label) last.items.push(s);
-      else upcomingByDate.push({ label, items: [s] });
+      else upcomingByWeek.push({ label, items: [s] });
     }
 
     const bannerHtml = _activeSeries ? _renderSeriesBanner(_activeSeries, _activeSeriesReg) : '';
-    const upcomingHtml = levelBannerHtml + upcomingByDate.map(g => `
+    const upcomingHtml = levelBannerHtml + upcomingByWeek.map(g => `
       <div class="session-group">
         <div class="session-group-label">${g.label}</div>
         ${g.items.map(_renderSessionCard).join('')}
@@ -994,10 +1010,12 @@ function _renderSessionCard(s) {
         <span class="session-badge level level-${esc(s.level || 'any')}">${esc(levelLabel)}</span>
         ${typeLabel    ? `<span class="session-badge type-${esc(s.type)}">${esc(typeLabel)}</span>` : ''}
         ${genderLabel  ? `<span class="session-badge gender-${esc(s.gender)}">${esc(genderLabel)}</span>` : ''}
-        ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
         ${_isAdmin && s.coach && s.coachFee > 0 && s.status === 'closed' ? _coachPayBadge(s) : ''}
-        <span class="session-meta-item">👥 ${countStr}</span>
-        <span class="session-meta-item">${esc(costStr)}</span>
+        <span class="session-meta-right">
+          ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
+          <span class="session-meta-item">👥 ${countStr}</span>
+          <span class="session-meta-item">${esc(costStr)}</span>
+        </span>
       </div>
       ${(_isAdmin || (_isProvider && _currentUser && s.providerUid === _currentUser.uid)) ? `
         <div class="session-admin-btns" onclick="event.stopPropagation()">
