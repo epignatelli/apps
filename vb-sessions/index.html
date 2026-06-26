@@ -665,9 +665,10 @@
   <div class="fbar-item">
     <div class="fbar-pop" id="fpop-date">
       <button class="fpop-opt active" data-date=""      onclick="setDateFilter('')">All</button>
-      <button class="fpop-opt"        data-date="today" onclick="setDateFilter('today')">Today</button>
-      <button class="fpop-opt"        data-date="week"  onclick="setDateFilter('week')">This week</button>
-      <button class="fpop-opt"        data-date="month" onclick="setDateFilter('month')">This month</button>
+      <button class="fpop-opt"        data-date="today"    onclick="setDateFilter('today')">Today</button>
+      <button class="fpop-opt"        data-date="week"     onclick="setDateFilter('week')">This week</button>
+      <button class="fpop-opt"        data-date="nextweek" onclick="setDateFilter('nextweek')">Next week</button>
+      <button class="fpop-opt"        data-date="month"    onclick="setDateFilter('month')">This month</button>
     </div>
     <button class="fbar-btn" id="fbtn-date" onclick="toggleFilterPopover('date')">
       <span id="flabel-date">Date</span><span class="fbar-caret">▾</span>

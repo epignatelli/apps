@@ -589,7 +589,7 @@ function setGenderFilter(gender) {
 
 const _TYPE_LABELS = { game: 'Game', league: 'League', clinic: 'Clinic', kqotc: 'KQOTC', tournament: 'Tournament', tryout: 'Tryout', training: 'Training' };
 const _STATUS_LABELS = { open: 'Open', closed: 'Closed' };
-const _DATE_LABELS   = { today: 'Today', week: 'This week', month: 'This month' };
+const _DATE_LABELS   = { today: 'Today', week: 'This week', nextweek: 'Next week', month: 'This month' };
 
 function setTypeFilter(type) {
   if (!type) {
@@ -828,12 +828,19 @@ async function renderHome() {
     if (_activeDateFilter) {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const end   = new Date(today);
-      if      (_activeDateFilter === 'today') end.setDate(end.getDate() + 1);
-      else if (_activeDateFilter === 'week')  end.setDate(end.getDate() + 7);
-      else if (_activeDateFilter === 'month') end.setMonth(end.getMonth() + 1);
+      let start = today;
+      if      (_activeDateFilter === 'today')    { end.setDate(end.getDate() + 1); }
+      else if (_activeDateFilter === 'week')     { end.setDate(end.getDate() + 7); }
+      else if (_activeDateFilter === 'nextweek') {
+        const day = today.getDay();
+        const daysToNextMon = day === 0 ? 1 : 8 - day;
+        start = new Date(today); start.setDate(today.getDate() + daysToNextMon);
+        end.setDate(today.getDate() + daysToNextMon + 7);
+      }
+      else if (_activeDateFilter === 'month')    { end.setMonth(end.getMonth() + 1); }
       sessions = sessions.filter(s => {
         const d = s.date?.toDate?.() || new Date(s.date);
-        return d >= today && d < end;
+        return d >= start && d < end;
       });
     }
     const providerBannerHtml = _activeProviderFilter
