@@ -1494,7 +1494,13 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
 
     <div class="policy-link-row">
       <button class="policy-link" onclick="openPolicy()">Terms &amp; cancellation policy</button>
-    </div>`;
+    </div>
+    ${(_isAdmin || (_isProvider && _currentUser && session.providerUid === _currentUser.uid)) ? `
+    <div class="session-detail-admin">
+      <button class="cta-btn secondary-btn" onclick="openSessionForm('${session.id}')">Edit session</button>
+      ${!isCancelled ? `<button class="cta-btn danger-btn" onclick="cancelSession('${session.id}')" title="Mark this session as cancelled and notify all attendees">Cancel session</button>` : ''}
+      ${_isAdmin ? `<button class="cta-btn danger-btn" onclick="deleteSession('${session.id}','${esc(session.venue || '')}',this)" title="Permanently delete this session and all attendee records — cannot be undone">Delete session</button>` : ''}
+    </div>` : ''}`;
 
   const hasWaitingList = waitingList.length > 0;
   const cancelLabel    = isAttending && hasWaitingList && !isCancelled && !isClosed
@@ -3231,6 +3237,18 @@ async function submitSessionForm() {
 }
 
 // ─── Delete session ────────────────────────────────────────────────────────────
+async function cancelSession(id) {
+  if (!_isAdmin) return;
+  if (!confirm('Cancel this session?\n\nAttendees will be notified by email.')) return;
+  try {
+    await _sessionRef(id).update({ status: 'cancelled' });
+    await openSession(id);
+  } catch(e) {
+    console.error('Cancel session failed:', e);
+    showToast('Couldn\'t cancel session. Try again.', 'error');
+  }
+}
+
 async function deleteSession(id, venue, btn) {
   if (!_isAdmin) return;
   if (!confirm(`Delete session at "${venue}"?\n\nAttendees will be notified by email.`)) return;

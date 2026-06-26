@@ -663,6 +663,21 @@ body {
 .policy-body p  { color: var(--text); }
 .policy-updated { font-size: 11px; color: var(--muted); margin-top: 8px; }
 
+.session-detail-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.danger-btn {
+  background: transparent;
+  border-color: rgba(220,50,50,.35);
+  color: var(--red, #e05555);
+}
+.danger-btn:hover { background: rgba(220,50,50,.08); border-color: rgba(220,50,50,.6); }
+
 .policy-link-row { display: flex; justify-content: center; padding: 4px 0 8px; }
 .policy-link {
   background: none; border: none;
