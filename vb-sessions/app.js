@@ -2951,6 +2951,7 @@ async function openSessionCreateInline() {
   if (!_allVenues.length) await _loadVenues();
   if (_isAdmin && !_allSeries.length) await _loadSeries();
 
+  _setNav('sub', null);
   showScreen('detail');
   _setTitle('New session');
   _setBack(() => goHome());
@@ -5236,6 +5237,7 @@ async function openSeriesCreateInline() {
     showToast('Set up payments in your profile before creating a pass.', 'error');
     return;
   }
+  _setNav('sub', null);
   showScreen('detail');
   _setTitle('New pass');
   _setBack(() => openSeriesScreen());
@@ -5247,6 +5249,7 @@ async function openSeriesCreateInline() {
 
 async function openSeriesEditInline(seriesId) {
   if (!_isAdmin && !_isProvider) return;
+  _setNav('sub', null);
   showScreen('detail');
   _setTitle('Edit pass');
   _setBack(() => openSeriesDetail(seriesId));
