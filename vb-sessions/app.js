@@ -1314,7 +1314,7 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
             .map(([pos, lbl]) => {
               const count = attendees.filter(a => (a.positions || []).includes(pos)).length;
               const full  = count >= pt[pos];
-              return `<span class="pos-fill-chip${full ? ' full' : ''}">${lbl} ${count}/${pt[pos]}</span>`;
+              return `<span class="pos-fill-chip ${pos}${full ? ' full' : ''}">${lbl} ${count}/${pt[pos]}</span>`;
             }).join('');
           return chips ? `<div class="detail-meta-row"><span class="detail-meta-label">Positions</span><span class="pos-fill-row">${chips}</span></div>` : '';
         })()}
