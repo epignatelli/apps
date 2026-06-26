@@ -1094,6 +1094,33 @@ async function openSession(id) {
   }
 }
 
+// ─── Position fill counting ────────────────────────────────────────────────────
+// Each player counts toward exactly one position (the one most in need of them).
+// Players with only one targeted position are assigned first; multi-position
+// players are then assigned greedily to the position with the most remaining slots.
+function _computePosCounts(attendees, positionTargets) {
+  const ptKeys = Object.keys(positionTargets || {});
+  if (!ptKeys.length) return {};
+  const counts = {};
+  for (const p of ptKeys) counts[p] = 0;
+  const multi = [];
+  for (const a of attendees) {
+    const aPos = (a.positions || []).filter(p => counts.hasOwnProperty(p));
+    if (aPos.length === 1)      counts[aPos[0]]++;
+    else if (aPos.length > 1)   multi.push(aPos);
+    // players with no targeted position don't count toward any target
+  }
+  for (const positions of multi) {
+    let best = positions[0], bestRemaining = -Infinity;
+    for (const p of positions) {
+      const remaining = (positionTargets[p] || 0) - counts[p];
+      if (remaining > bestRemaining) { bestRemaining = remaining; best = p; }
+    }
+    counts[best]++;
+  }
+  return counts;
+}
+
 // ─── Team builder ──────────────────────────────────────────────────────────────
 let _activeTeamCount = 0; // 0 = use default derived from player count
 
@@ -1321,10 +1348,11 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
           const pt = session.positionTargets;
           if (!session.askPositions || !pt || !_currentUser) return '';
           const PLABELS = { setter: 'S', hitter: 'H', middle: 'M', libero: 'L' };
+          const _pCounts = _computePosCounts(attendees, pt);
           const chips = Object.entries(PLABELS)
             .filter(([pos]) => pt[pos])
             .map(([pos, lbl]) => {
-              const count = attendees.filter(a => (a.positions || []).includes(pos)).length;
+              const count = _pCounts[pos] || 0;
               const full  = count >= pt[pos];
               return `<span class="pos-fill-chip ${pos}${full ? ' full' : ''}">${lbl} ${count}/${pt[pos]}</span>`;
             }).join('');
@@ -1458,10 +1486,8 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
   // Compute whether all position targets are met (relevant for position-queue routing)
   const _pt = session.positionTargets || {};
   const _ptKeys = Object.keys(_pt);
-  const _allTargetsFull = _ptKeys.length > 0 && _ptKeys.every(p => {
-    const cnt = attendees.filter(a => (a.positions || []).includes(p)).length;
-    return cnt >= _pt[p];
-  });
+  const _pFill = _computePosCounts(attendees, _pt);
+  const _allTargetsFull = _ptKeys.length > 0 && _ptKeys.every(p => (_pFill[p] || 0) >= _pt[p]);
   const msgBtn = _isAdmin && !isCancelled
     ? `<button class="cta-btn secondary-btn" onclick="openMessageForm('${session.id}')">✉ Message attendees</button>`
     : '';
@@ -1541,6 +1567,66 @@ function registerFree(sessionId) { return _doRegister(sessionId, { feeWaived: tr
 // ─── Position queue ────────────────────────────────────────────────────────────
 
 const POS_LABELS_FULL = { setter: 'Setter', hitter: 'Hitter', middle: 'Middle', libero: 'Libero' };
+
+function _showMixedPositionModal(sessionId, openPositions, fullPositions, extra) {
+  const existing = document.getElementById('mixed-pos-overlay');
+  if (existing) existing.remove();
+
+  const openLabels = openPositions.map(p => POS_LABELS_FULL[p] || p).join(', ');
+  const queueRows  = fullPositions.map(p => `
+    <label class="pos-queue-check-row">
+      <input type="checkbox" value="${p}" checked />
+      <span class="pos-queue-check-label">${POS_LABELS_FULL[p] || p} <span style="color:var(--muted);font-size:12px">— full</span></span>
+    </label>`).join('');
+
+  const el = document.createElement('div');
+  el.id = 'mixed-pos-overlay';
+  el.className = 'overlay open';
+  el.innerHTML = `
+    <div class="panel" style="max-width:420px">
+      <div class="panel-header"><span class="panel-title">Some positions are full</span></div>
+      <p style="font-size:14px;color:var(--muted);line-height:1.55;padding-bottom:16px">
+        You'll be registered as <strong style="color:var(--text)">${openLabels}</strong>.
+      </p>
+      <p style="font-size:13px;color:var(--muted);padding-bottom:12px">Also join the queue for:</p>
+      <div id="mixed-pos-queues" style="display:flex;flex-direction:column;gap:10px;padding-bottom:20px">${queueRows}</div>
+      <div id="mixed-pos-error" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:12px"></div>
+      <button class="cta-btn" onclick="_confirmMixedPosition('${sessionId}')">Register →</button>
+      <button class="cta-btn secondary-btn" style="margin-top:8px" onclick="document.getElementById('mixed-pos-overlay').remove()">Cancel</button>
+    </div>`;
+  document.body.appendChild(el);
+  // stash extra so the confirm handler can use it
+  el._extra = extra;
+  el._openPositions = openPositions;
+}
+
+window._confirmMixedPosition = async function(sessionId) {
+  const overlay     = document.getElementById('mixed-pos-overlay');
+  const extra       = overlay._extra;
+  const openPos     = overlay._openPositions;
+  const queuedPos   = Array.from(overlay.querySelectorAll('#mixed-pos-queues input:checked')).map(el => el.value);
+  const btn         = overlay.querySelector('.cta-btn');
+  btn.disabled = true;
+  try {
+    // Register with open positions
+    await _doRegister(sessionId, { ...extra, positions: openPos });
+    // Optionally join queues for full positions
+    if (queuedPos.length) {
+      await _posWlRef(sessionId).doc(_currentUser.uid).set({
+        name:      _currentUser.displayName || _currentUser.email,
+        email:     _currentUser.email || '',
+        uid:       _currentUser.uid,
+        positions: queuedPos,
+        joinedAt:  firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    overlay.remove();
+  } catch(e) {
+    console.error('Mixed position register failed:', e);
+    document.getElementById('mixed-pos-error').textContent = 'Something went wrong. Try again.';
+    btn.disabled = false;
+  }
+};
 
 function _showQueueModal(sessionId, suggestedPositions) {
   const existing = document.getElementById('queue-modal-overlay');
@@ -1787,21 +1873,22 @@ async function _doRegister(sessionId, extra = {}) {
       if (g) extra = { ...extra, gender: g };
     }
 
-    // Position-target check: if all chosen positions are full → route to queue modal.
+    // Position-target check: route to queue or mixed modal when positions are full.
     const pt = session.positionTargets || {};
     if (session.askPositions && Object.keys(pt).length && (extra.positions || []).length) {
-      const counts = {};
-      for (const p of Object.keys(pt))
-        counts[p] = _currentAttendees.filter(a => (a.positions || []).includes(p)).length;
-      const full = (extra.positions).filter(p => pt[p] != null && counts[p] >= pt[p]);
-      const open = (extra.positions).filter(p => !pt[p] || counts[p] < pt[p]);
+      const counts = _computePosCounts(_currentAttendees, pt);
+      const full = extra.positions.filter(p => pt[p] != null && (counts[p] || 0) >= pt[p]);
+      const open = extra.positions.filter(p => !pt[p] || (counts[p] || 0) < pt[p]);
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
       if (open.length === 0) {
-        if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
         _showQueueModal(sessionId, full);
         return;
       }
-      // Drop full positions — register with open ones only.
-      extra = { ...extra, positions: open };
+      if (full.length > 0) {
+        _showMixedPositionModal(sessionId, open, full, extra);
+        return;
+      }
+      // All chosen positions are open — fall through to register normally.
     }
 
     // Paid session → redirect to Stripe Checkout (unless fee is waived by admin).
