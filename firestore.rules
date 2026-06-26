@@ -62,13 +62,15 @@ service cloud.firestore {
                         && validSessionKeys());
       allow delete: if isAdmin()
                     || (isProvider() && resource.data.providerUid == request.auth.uid);
-      // attendeeCount / waitingListCount are written by Cloud Functions (Admin SDK) only
       allow update: if isAdmin()
                     || (isProvider() && resource.data.providerUid == request.auth.uid)
                     || (request.auth != null
                         && resource.data.coachUid == request.auth.uid
                         && request.resource.data.diff(resource.data)
-                             .affectedKeys().hasOnly(['status', 'report']));
+                             .affectedKeys().hasOnly(['status', 'report']))
+                    || (request.auth != null
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys().hasOnly(['attendeeCount', 'waitingListCount']));
     }
 
     match /sessions/{sessionId}/attendees/{attendeeId} {
