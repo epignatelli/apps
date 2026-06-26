@@ -3067,6 +3067,11 @@ function openSessionForm(id = null) {
     if (el) el.style.display = _isAdmin ? '' : 'none';
   });
 
+  if (!id) {
+    // Creation: redirect to inline form; overlay is only kept for legacy reference
+    openSessionCreateInline();
+    return;
+  }
   document.getElementById('session-form-overlay').classList.add('open');
 }
 
@@ -3112,6 +3117,301 @@ function closeSessionForm() {
   document.getElementById('session-form-overlay').classList.remove('open');
   _editingId = null;
 }
+
+async function openSessionCreateInline() {
+  if (!_canCreate()) return;
+  if (!_isAdmin && !_providerOnboardingComplete) {
+    showToast('Set up payments in your profile before creating sessions.', 'error');
+    return;
+  }
+  if (!_allVenues.length) await _loadVenues();
+  if (_isAdmin && !_allSeries.length) await _loadSeries();
+
+  showScreen('detail');
+  _setTitle('New session');
+  _setBack(() => goHome());
+
+  const content = document.getElementById('detail-content');
+  const footer  = document.getElementById('detail-footer');
+
+  const venueOpts  = '<option value="">Select a venue…</option>' + _allVenues.map(v =>
+    `<option value="${v.id}"${_activeSeriesFilter && v.id === _currentSession?.venueId ? ' selected' : ''}>${esc(v.name)}</option>`
+  ).join('');
+  const seriesOpts = '<option value="">None</option>' + _allSeries.map(sr =>
+    `<option value="${sr.id}"${sr.id === (_activeSeriesFilter?.id || '') ? ' selected' : ''}>${esc(sr.name)}</option>`
+  ).join('');
+
+  content.innerHTML = `
+    <div class="form-fields" style="padding-bottom:80px">
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Date</label>
+          <input class="field-input" type="date" id="ie-date" />
+        </div>
+        <div class="field">
+          <label class="field-label">Time</label>
+          <input class="field-input" type="time" id="ie-time" />
+        </div>
+      </div>
+      ${_isAdmin ? `
+      <div class="field-row" id="ie-repeat-row">
+        <div class="field">
+          <label class="field-label">Repeat</label>
+          <select class="field-input field-select" id="ie-repeat" onchange="_ieOnRepeatChange()">
+            <option value="">No repeat</option>
+            <option value="weekly">Every week</option>
+            <option value="biweekly">Every 2 weeks</option>
+            <option value="monthly">Every month</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row" id="ie-repeat-end-row" style="display:none">
+        <div class="field">
+          <label class="field-label">End</label>
+          <select class="field-input field-select" id="ie-repeat-end-type" onchange="_ieOnRepeatEndTypeChange()">
+            <option value="count">After N sessions</option>
+            <option value="date">Until date</option>
+          </select>
+        </div>
+        <div class="field" id="ie-repeat-count-wrap">
+          <label class="field-label">Sessions</label>
+          <input class="field-input" type="number" id="ie-repeat-count" min="2" max="52" value="4" inputmode="numeric" />
+        </div>
+        <div class="field" id="ie-repeat-date-wrap" style="display:none">
+          <label class="field-label">Until</label>
+          <input class="field-input" type="date" id="ie-repeat-until" />
+        </div>
+      </div>` : ''}
+      <div class="field">
+        <label class="field-label">Venue</label>
+        <select class="field-input field-select" id="ie-venue">${venueOpts}</select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Type</label>
+          <select class="field-input field-select" id="ie-type">
+            ${SESSION_TYPES.map(t => `<option value="${t.value}"${t.value==='game'?' selected':''}>${t.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Gender</label>
+          <select class="field-input field-select" id="ie-gender">
+            ${SESSION_GENDERS.map(g => `<option value="${g.value}"${g.value==='mixed'?' selected':''}>${g.label}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      ${_isAdmin ? `
+      <div class="field">
+        <label class="field-label">Pass <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— optional</span></label>
+        <select class="field-input field-select" id="ie-series">${seriesOpts}</select>
+      </div>` : ''}
+      <div class="field">
+        <label class="field-label">Description</label>
+        <textarea class="field-input field-textarea" id="ie-description" placeholder="What to expect, skill level, what to bring…" maxlength="400"></textarea>
+      </div>
+      ${_isAdmin ? `
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Coach</label>
+          <select class="field-input field-select" id="ie-coach-select" onchange="_ieOnCoachChange()">
+            <option value="">None</option>
+          </select>
+          <input class="field-input" type="text" id="ie-coach-custom" placeholder="Coach name"
+            maxlength="60" autocomplete="off" autocorrect="off" spellcheck="false"
+            style="display:none;margin-top:6px" />
+        </div>
+        <div class="field">
+          <label class="field-label">Level</label>
+          <select class="field-input field-select" id="ie-level">
+            <option value="">Any level</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+            <option value="competitive">Competitive</option>
+          </select>
+        </div>
+      </div>` : `
+      <div class="field">
+        <label class="field-label">Level</label>
+        <select class="field-input field-select" id="ie-level">
+          <option value="">Any level</option>
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+          <option value="competitive">Competitive</option>
+        </select>
+      </div>`}
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Max players</label>
+          <input class="field-input" type="number" id="ie-max" min="1" max="100" inputmode="numeric" placeholder="12" />
+        </div>
+        <div class="field">
+          <label class="field-label">Cost (£)</label>
+          <input class="field-input" type="number" id="ie-cost" min="0" step="0.5" inputmode="decimal" placeholder="0" />
+          ${_isAdmin ? `<label class="toggle-row" style="margin-top:6px">
+            <input type="checkbox" id="ie-absorb-fee" />
+            <span class="toggle-label-text">Waive booking fee</span>
+          </label>` : ''}
+        </div>
+      </div>
+      ${_isAdmin ? `
+      <div class="field">
+        <label class="field-label">Coach fee (£)</label>
+        <input class="field-input" type="number" id="ie-coach-fee" min="0" step="0.5" inputmode="decimal" placeholder="50" />
+        <div class="field-hint">Amount paid to the coach after the session closes.</div>
+      </div>` : ''}
+      <div class="field">
+        <label class="field-label">Registration deadline</label>
+        <input class="field-input" type="datetime-local" id="ie-deadline" />
+      </div>
+      <div class="field">
+        <label class="toggle-row">
+          <input type="checkbox" id="ie-ask-positions"
+            onchange="document.getElementById('ie-pos-targets-field').style.display=this.checked?'':'none'" />
+          <span class="toggle-label-text">Ask players for their position when registering</span>
+        </label>
+      </div>
+      <div class="field" id="ie-pos-targets-field" style="display:none">
+        <label class="field-label">Position targets <span class="field-hint">— leave blank for no limit</span></label>
+        <div class="pos-targets-row">
+          <label class="pos-target-item"><span class="pos-target-label">Setter</span><input class="field-input pos-target-input" type="number" id="ie-target-setter" min="0" max="99" placeholder="–"/></label>
+          <label class="pos-target-item"><span class="pos-target-label">Hitter</span><input class="field-input pos-target-input" type="number" id="ie-target-hitter" min="0" max="99" placeholder="–"/></label>
+          <label class="pos-target-item"><span class="pos-target-label">Middle</span><input class="field-input pos-target-input" type="number" id="ie-target-middle" min="0" max="99" placeholder="–"/></label>
+          <label class="pos-target-item"><span class="pos-target-label">Libero</span><input class="field-input pos-target-input" type="number" id="ie-target-libero" min="0" max="99" placeholder="–"/></label>
+        </div>
+      </div>
+      ${!_isAdmin ? `
+      <label class="form-insurance-label">
+        <input type="checkbox" id="ie-insurance" />
+        I confirm I hold valid public liability insurance for this session
+      </label>` : ''}
+      <div class="form-error" id="ie-error"></div>
+    </div>`;
+
+  footer.innerHTML = `
+    <button class="cta-btn secondary-btn" onclick="goHome()">Cancel</button>
+    <button class="cta-btn" id="ie-save-btn" onclick="_submitInlineCreate()">Create session</button>`;
+
+  if (_isAdmin) await _ieLoadCoachOptions('', '');
+}
+
+window._ieOnRepeatChange = function() {
+  const repeat = document.getElementById('ie-repeat')?.value;
+  const endRow = document.getElementById('ie-repeat-end-row');
+  if (endRow) endRow.style.display = repeat ? '' : 'none';
+};
+window._ieOnRepeatEndTypeChange = function() {
+  const type = document.getElementById('ie-repeat-end-type')?.value;
+  const cw = document.getElementById('ie-repeat-count-wrap');
+  const dw = document.getElementById('ie-repeat-date-wrap');
+  if (cw) cw.style.display = type === 'count' ? '' : 'none';
+  if (dw) dw.style.display = type === 'date'  ? '' : 'none';
+};
+
+window._submitInlineCreate = async function() {
+  const errorEl = document.getElementById('ie-error');
+  const saveBtn = document.getElementById('ie-save-btn');
+  const dateVal = document.getElementById('ie-date').value;
+  const venueId = document.getElementById('ie-venue').value;
+  const maxVal  = parseInt(document.getElementById('ie-max').value);
+  const insuranceEl = document.getElementById('ie-insurance');
+
+  if (!dateVal)                    { errorEl.textContent = 'Please set a date.'; return; }
+  if (!venueId)                    { errorEl.textContent = 'Please select a venue.'; return; }
+  if (isNaN(maxVal) || maxVal < 1) { errorEl.textContent = 'Max players must be at least 1.'; return; }
+  if (insuranceEl && !insuranceEl.checked) {
+    errorEl.textContent = 'Please confirm you hold public liability insurance.'; return;
+  }
+
+  errorEl.textContent = '';
+  saveBtn.disabled = true;
+
+  const venueObj    = _allVenues.find(v => v.id === venueId);
+  const costVal     = parseFloat(document.getElementById('ie-cost').value) || 0;
+  const absorbEl    = document.getElementById('ie-absorb-fee');
+  const absorbFee   = absorbEl ? absorbEl.checked : false;
+  const coachFeeEl  = document.getElementById('ie-coach-fee');
+  const coachFee    = coachFeeEl ? (parseFloat(coachFeeEl.value) || 0) : 0;
+  const askPos      = document.getElementById('ie-ask-positions').checked;
+  const deadlineStr = document.getElementById('ie-deadline').value;
+  const seriesSelEl = document.getElementById('ie-series');
+  const seriesIdVal = seriesSelEl?.value || '';
+  const seriesObj   = _allSeries.find(sr => sr.id === seriesIdVal);
+
+  const coachSel    = _isAdmin ? (document.getElementById('ie-coach-select')?.value || '') : '';
+  const coachUidVal = _isAdmin && coachSel && coachSel !== '__custom__' ? coachSel : '';
+  const coachVal    = _isAdmin
+    ? (coachSel === '__custom__'
+        ? (document.getElementById('ie-coach-custom')?.value.trim() || '')
+        : (coachSel ? (document.querySelector(`#ie-coach-select option[value="${coachSel}"]`)?.textContent || '') : ''))
+    : '';
+
+  const posTargets = (() => {
+    if (!askPos) return null;
+    const t = {};
+    for (const p of ['setter','hitter','middle','libero']) {
+      const v = parseInt(document.getElementById(`ie-target-${p}`)?.value);
+      if (v > 0) t[p] = v;
+    }
+    return Object.keys(t).length ? t : null;
+  })();
+
+  const repeat     = _isAdmin ? (document.getElementById('ie-repeat')?.value || '') : '';
+  const endType    = document.getElementById('ie-repeat-end-type')?.value || 'count';
+  const endCount   = parseInt(document.getElementById('ie-repeat-count')?.value) || 4;
+  const endDateStr = document.getElementById('ie-repeat-until')?.value || '';
+  const dates      = repeat ? _expandDates(dateVal, repeat, endType, endCount, endDateStr) : [new Date(dateVal + 'T12:00:00')];
+
+  if (dates.length === 0) { errorEl.textContent = 'Invalid repeat configuration.'; saveBtn.disabled = false; return; }
+
+  const base = {
+    time:                 document.getElementById('ie-time').value,
+    venue:                venueObj?.name || '',
+    venueId,
+    coach:                coachVal,
+    coachUid:             coachUidVal,
+    level:                document.getElementById('ie-level').value,
+    type:                 document.getElementById('ie-type').value,
+    gender:               document.getElementById('ie-gender').value,
+    description:          document.getElementById('ie-description').value,
+    maxPlayers:           maxVal,
+    cost:                 costVal,
+    coachFee,
+    absorbFee,
+    playerPrice:          absorbFee ? costVal : _playerPrice(costVal),
+    providerUid:          _currentUser.uid,
+    status:               'open',
+    askPositions:         askPos,
+    positionTargets:      posTargets,
+    seriesId:             seriesIdVal || null,
+    seriesName:           seriesObj?.name || '',
+    attendeeCount:        0,
+    registrationDeadline: deadlineStr ? firebase.firestore.Timestamp.fromDate(new Date(deadlineStr)) : null,
+    ...(insuranceEl ? { insuranceDeclaredBy: _currentUser.uid, insuranceDeclaredAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
+  };
+
+  try {
+    if (dates.length === 1) {
+      const data = { ...base, date: firebase.firestore.Timestamp.fromDate(dates[0]), createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+      const ref  = await _sessionsRef().add(data);
+      await openSession(ref.id);
+    } else {
+      const batch = firebase.firestore().batch();
+      dates.forEach(d => {
+        const ref = _sessionsRef().doc();
+        batch.set(ref, { ...base, date: firebase.firestore.Timestamp.fromDate(d), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      });
+      await batch.commit();
+      showToast(`${dates.length} sessions created.`);
+      goHome();
+    }
+  } catch(e) {
+    console.error('Create session failed:', e);
+    errorEl.textContent = e.code === 'permission-denied' ? 'Permission denied.' : 'Save failed — try again.';
+    saveBtn.disabled = false;
+  }
+};
 
 async function openSessionEditInline(sessionId) {
   if (!_isAdmin && !_isProvider) return;
