@@ -1000,20 +1000,18 @@ function _renderSessionCard(s) {
   const genderLabel = SESSION_GENDERS.find(g => g.value === s.gender)?.label || '';
   return `
     <div class="session-card${s.status === 'closed' || s.status === 'cancelled' ? ' dim-card' : ''}" onclick="openSession('${s.id}')">
-      <div class="session-card-top">
-        <div class="session-card-main">
-          <div class="session-date">${esc(dateStr)}${timeStr ? ` · ${esc(timeStr)}` : ''}</div>
-          <div class="session-venue">${esc(s.venue || '—')}${s.coach ? ` · ${esc(s.coach)}` : ''}</div>
-          ${s.description ? `<div class="session-desc">${esc(s.description)}</div>` : ''}
-        </div>
-        <div class="session-card-aside">
-          ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
-          <div class="session-aside-counts">
-            <span class="session-meta-item">👥 ${countStr}</span>
-            <span class="session-meta-item">${esc(costStr)}</span>
-          </div>
+      <div class="session-card-row">
+        <div class="session-date">${esc(dateStr)}${timeStr ? ` · ${esc(timeStr)}` : ''}</div>
+        ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
+      </div>
+      <div class="session-card-row">
+        <div class="session-venue">${esc(s.venue || '—')}${s.coach ? ` · ${esc(s.coach)}` : ''}</div>
+        <div class="session-aside-counts">
+          <span class="session-meta-item">👥 ${countStr}</span>
+          <span class="session-meta-item">${esc(costStr)}</span>
         </div>
       </div>
+      ${s.description ? `<div class="session-desc">${esc(s.description)}</div>` : ''}
       <div class="session-card-meta">
         ${statusClass !== 'open' ? `<span class="session-badge ${statusClass}">${statusLabel}</span>` : ''}
         <span class="session-badge level level-${esc(s.level || 'any')}">${esc(levelLabel)}</span>
