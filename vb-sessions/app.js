@@ -337,7 +337,7 @@ getAuth().onAuthStateChanged(async user => {
       await _routeFromHash();
       if (_pendingCheckoutSuccess) {
         if (_pendingCheckoutSuccess.startsWith('series:')) {
-          showToast('Series pass confirmed! You\'re enrolled in all sessions.');
+          showToast('Pass confirmed! You\'re enrolled in all sessions.');
         } else {
           showToast('Payment confirmed! You\'re in.');
         }
@@ -843,7 +843,7 @@ async function renderHome() {
       : '';
     if (!sessions.length) {
       const bannerHtml = _activeSeries ? _renderSeriesBanner(_activeSeries, _activeSeriesReg) : '';
-      container.innerHTML = providerBannerHtml + levelBannerHtml + bannerHtml + `<div class="home-empty">${_activeSeriesFilter ? 'No sessions in this series yet.' : _activeProviderFilter ? 'No sessions hosted yet.' : 'No sessions matching this filter.'}</div>`;
+      container.innerHTML = providerBannerHtml + levelBannerHtml + bannerHtml + `<div class="home-empty">${_activeSeriesFilter ? 'No sessions in this pass yet.' : _activeProviderFilter ? 'No sessions hosted yet.' : 'No sessions matching this filter.'}</div>`;
       return;
     }
 
@@ -943,14 +943,14 @@ function _renderSeriesBanner(series, reg) {
 
   let cta = '';
   if (reg) {
-    cta = `<span class="session-badge series-pass-badge">Series pass ✓</span>`;
+    cta = `<span class="session-badge series-pass-badge">Pass active ✓</span>`;
   } else if (_currentUser && !isFull) {
-    const label = series.cost > 0 ? `Join series — ${cost}` : 'Join series — Free';
+    const label = series.cost > 0 ? `Get pass — ${cost}` : 'Get pass — Free';
     cta = `<button class="cta-btn series-banner-cta" onclick="joinSeries('${series.id}')">${label}</button>`;
   } else if (_currentUser && isFull && _seriesInvite?.seriesId === series.id) {
-    const label = series.cost > 0 ? `Join series — ${cost}` : 'Join series — Free';
+    const label = series.cost > 0 ? `Get pass — ${cost}` : 'Get pass — Free';
     cta = `<button class="cta-btn series-banner-cta" onclick="joinSeries('${series.id}')">${label}</button>
-           <div class="series-invite-note">You were invited — joining will extend the pass by one spot.</div>`;
+           <div class="series-invite-note">You were invited — getting this pass will add one spot.</div>`;
   } else if (isFull) {
     cta = `<span class="session-badge full-badge">Pass full</span>`;
   }
@@ -1007,11 +1007,11 @@ function _renderSessionCard(s) {
           ${s.description ? `<div class="session-desc">${esc(s.description)}</div>` : ''}
         </div>
         <div class="session-card-aside">
+          ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
           <div class="session-aside-counts">
             <span class="session-meta-item">👥 ${countStr}</span>
             <span class="session-meta-item">${esc(costStr)}</span>
           </div>
-          ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
         </div>
       </div>
       <div class="session-card-meta">
@@ -1419,7 +1419,7 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
                 ${genderSym ? `<span class="attendee-gender ${genderClass}">${genderSym}</span>` : ''}
                 <button class="attendee-name-btn" onclick="openProfileScreen('${a.id}')">${esc(a.name)}</button>
                 ${posChips ? `<div class="att-chips">${posChips}</div>` : ''}
-                ${a.seriesId ? `<span class="att-chip series-chip" title="Series pass">S</span>` : ''}
+                ${a.seriesId ? `<span class="att-chip series-chip" title="Pass holder">P</span>` : ''}
                 ${canSee && session.cost > 0 ? `<span class="att-chip ${a.feeWaived ? 'waived-chip' : a.paid ? 'paid-chip' : 'unpaid-chip'}">${a.feeWaived ? '£–' : a.paid ? '£✓' : '£?'}</span>` : ''}
                 ${_isAdmin && a.photoConsent === true  ? `<span class="att-chip photo-chip"   title="Consented to photos/filming">📷</span>` : ''}
                 ${_isAdmin && a.photoConsent === false ? `<span class="att-chip nophoto-chip" title="No photo/filming consent">📷✗</span>` : ''}
@@ -1517,7 +1517,7 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
   // Series pass: replace cancel with drop-out, replace join with series-pass join
   const dropOutBtn  = seriesReg ? `<button class="cta-btn secondary-btn" onclick="dropOutOfSession('${session.id}')">Drop out of this session</button>` : '';
   const seriesJoin  = seriesReg && !isAttending && !isFull && !deadlinePassed
-    ? `<button class="cta-btn" onclick="registerWithSeriesPass('${session.id}')">Join with series pass →</button>`
+    ? `<button class="cta-btn" onclick="registerWithSeriesPass('${session.id}')">Join with pass →</button>`
     : '';
 
   if (isClosed) {
@@ -1987,7 +1987,7 @@ async function joinSeries(seriesId) {
     if (data.url) {
       window.location.href = data.url;
     } else {
-      showToast('You\'re in! Series pass activated.');
+      showToast('You\'re in! Pass activated.');
       _seriesInvite    = null;
       _activeSeriesReg = { paymentStatus: 'paid' };
       renderHome();
@@ -1995,11 +1995,11 @@ async function joinSeries(seriesId) {
   } catch(e) {
     const alreadyHas = e.message && e.message.toLowerCase().includes('already registered');
     if (alreadyHas) {
-      showToast('You already have a series pass.');
+      showToast('You already have a pass.');
       _activeSeriesReg = { paymentStatus: 'paid' };
       renderHome();
     } else {
-      showToast(e.message || 'Couldn\'t join series. Try again.', 'error');
+      showToast(e.message || 'Couldn\'t activate pass. Try again.', 'error');
       if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
     }
   }
@@ -2040,13 +2040,13 @@ async function registerWithSeriesPass(sessionId) {
 
 async function dropOutOfSession(sessionId) {
   if (!_currentUser) return;
-  if (!confirm('Drop out of this session? Your series pass stays active for all other sessions.')) return;
+  if (!confirm('Drop out of this session? Your pass stays active for all other sessions.')) return;
   const btns = document.querySelectorAll('#detail-footer button');
   btns.forEach(b => { b.disabled = true; });
   try {
     await callFn('dropOutSeries', { sessionId });
     _gaEvent('leave_session', { session_id: sessionId });
-    showToast('Dropped out. Your series pass is still active.');
+    showToast('Dropped out. Your pass is still active.');
     await openSession(sessionId);
   } catch(e) {
     showToast(e.message || 'Couldn\'t drop out. Try again.', 'error');
@@ -2628,7 +2628,7 @@ async function openProfileScreen(uid) {
 
     const seriesPassSection = showHistory ? `
       <div class="detail-section">
-        <div class="detail-section-title">Series passes</div>
+        <div class="detail-section-title">Passes</div>
         <div class="profile-history-list">
           ${myPasses.length ? myPasses.map(({ s, reg }) => {
               const r = reg.data();
@@ -2639,7 +2639,7 @@ async function openProfileScreen(uid) {
                 <span class="history-cost">${cost}</span>
               </div>`;
             }).join('')
-            : '<div class="empty-note">No series passes yet.</div>'
+            : '<div class="empty-note">No passes yet.</div>'
           }
         </div>
       </div>` : '';
@@ -2655,7 +2655,7 @@ async function openProfileScreen(uid) {
 
     const _sessionRow = ({ s, att }) => {
       const a = att.data();
-      const costStr = a.seriesId ? 'Series pass'
+      const costStr = a.seriesId ? 'Pass'
                     : a.feeWaived ? 'Free (waived)'
                     : a.paid && s.cost > 0 ? `£${_formatPlayerPrice(s.cost, s.absorbFee)}`
                     : 'Free';
@@ -4658,17 +4658,17 @@ async function _joinSeriesFromCard(seriesId, btn) {
     if (data.url) {
       window.location.href = data.url;
     } else {
-      showToast('You\'re in! Series pass activated.');
+      showToast('You\'re in! Pass activated.');
       _seriesInvite = null;
       renderSeries();
     }
   } catch(e) {
     const alreadyHas = e.message && e.message.toLowerCase().includes('already registered');
     if (alreadyHas) {
-      showToast('You already have a series pass.');
+      showToast('You already have a pass.');
       renderSeries();
     } else {
-      showToast(e.message || 'Couldn\'t join series. Try again.', 'error');
+      showToast(e.message || 'Couldn\'t activate pass. Try again.', 'error');
       if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
     }
   }
@@ -4716,11 +4716,11 @@ async function openSeriesDetail(seriesId) {
 
     let cta = '';
     if (reg) {
-      cta = `<span class="session-badge series-pass-badge" style="font-size:14px;padding:6px 12px">Series pass ✓</span>`;
+      cta = `<span class="session-badge series-pass-badge" style="font-size:14px;padding:6px 12px">Pass active ✓</span>`;
     } else if (_currentUser && (!isFull || _seriesInvite?.seriesId === seriesId)) {
       const label = series.cost > 0 ? `Buy pass — ${cost}` : 'Join — Free';
       cta = `<button class="cta-btn" style="margin-top:4px" onclick="joinSeries('${seriesId}')">${label}</button>`;
-      if (isFull) cta += `<div class="series-invite-note">You were invited — joining will add one spot.</div>`;
+      if (isFull) cta += `<div class="series-invite-note">You were invited — getting this pass will add one spot.</div>`;
     } else if (isFull) {
       cta = `<span class="session-badge full-badge" style="font-size:14px;padding:6px 12px">Pass full</span>`;
     }
@@ -4820,7 +4820,7 @@ function openSeriesForm(id) {
   }
   _editingSeriesId = id || null;
   const s = id ? _allSeries.find(x => x.id === id) : null;
-  document.getElementById('series-form-title').textContent = s ? 'Edit series' : 'New series';
+  document.getElementById('series-form-title').textContent = s ? 'Edit pass' : 'New pass';
   document.getElementById('sf-name').value        = s?.name        || '';
   document.getElementById('sf-description').value = s?.description || '';
   const startD = s?.startDate?.toDate?.();

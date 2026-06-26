@@ -45,7 +45,7 @@
   </div>
   <div class="nav-tabs-row" id="nav-tabs-row" style="display:none">
     <button class="nav-tab"            data-tab="home"     onclick="goHome()">Sessions</button>
-    <button class="nav-tab"            data-tab="series"   onclick="openSeriesScreen()">Series</button>
+    <button class="nav-tab"            data-tab="series"   onclick="openSeriesScreen()">Passes</button>
     <button class="nav-tab admin-tab"  data-tab="finances" onclick="openFinancesScreen()">Finances</button>
     <button class="nav-tab admin-tab"  data-tab="insights" onclick="openInsightsScreen()">Insights</button>
     <button class="nav-tab admin-tab"  data-tab="admin"    onclick="openAdminScreen()">Admin</button>
@@ -140,7 +140,7 @@
           </div>
         </div>
         <div class="field" id="form-series-field">
-          <label class="field-label">Series <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— optional</span></label>
+          <label class="field-label">Pass <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— optional</span></label>
           <div class="venue-field-row">
             <select class="field-input field-select" id="form-series-select">
               <option value="">None</option>
@@ -354,7 +354,7 @@
   </div>
 
   <div class="footer" id="series-footer" style="display:none">
-    <button class="cta-btn" onclick="openSeriesForm()">+ New series</button>
+    <button class="cta-btn" onclick="openSeriesForm()">+ New pass</button>
   </div>
 
 </div>
@@ -420,7 +420,7 @@
 <div class="overlay" id="series-form-overlay">
   <div class="panel">
     <div class="panel-header">
-      <span class="panel-title" id="series-form-title">New series</span>
+      <span class="panel-title" id="series-form-title">New pass</span>
       <button class="panel-close" onclick="closeSeriesForm()">✕</button>
     </div>
     <div class="field">
@@ -455,7 +455,7 @@
     <p id="series-form-error" style="color:var(--red);font-size:13px;min-height:18px"></p>
     <div style="display:flex;gap:8px">
       <button class="cta-btn secondary-btn" id="series-delete-btn" onclick="deleteSeries()" style="display:none">Delete</button>
-      <button class="cta-btn" id="series-submit-btn" onclick="submitSeriesForm()" style="flex:1">Save series</button>
+      <button class="cta-btn" id="series-submit-btn" onclick="submitSeriesForm()" style="flex:1">Save pass</button>
     </div>
   </div>
 </div>
