@@ -1052,7 +1052,7 @@ body {
 .session-badge.gender-men   { background: rgba(236,72,153,.13);    color: #f472b6;       }
 
 /* ─── Series ref badge (on session card) ─────────────────────────────── */
-.session-badge.series-ref { background: rgba(20,184,166,.15); color: #2dd4bf; }
+.session-badge.series-ref { background: rgba(20,184,166,.15); color: #2dd4bf; border-radius: 0; }
 
 /* ─── Series cards ────────────────────────────────────────────────────── */
 .series-card {

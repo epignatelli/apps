@@ -1011,7 +1011,7 @@ function _renderSessionCard(s) {
     <div class="session-card${s.status === 'closed' || s.status === 'cancelled' ? ' dim-card' : ''}" onclick="openSession('${s.id}')">
       <div class="session-card-row">
         <div class="session-date">${esc(dateStr)}${timeStr ? ` · ${esc(timeStr)}` : ''}</div>
-        ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)}</span>` : ''}
+        ${s.seriesName && !_activeSeriesFilter ? `<span class="session-badge series-ref">${esc(s.seriesName)} PASS</span>` : ''}
       </div>
       <div class="session-venue">${esc(s.venue || '—')}${s.coach ? ` · ${esc(s.coach)}` : ''}</div>
       ${s.description ? `<div class="session-desc">${esc(s.description)}</div>` : ''}
