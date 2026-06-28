@@ -2863,7 +2863,6 @@ async function openProfileScreen(uid) {
       </div>` : '';
 
     const _roleCheck  = `<span class="role-status-active">Active</span>`;
-    const _roleLocked = `<span class="role-status-locked">Invitation only</span>`;
     const rolesSection = isOwn ? `
       <div class="detail-section">
         <div class="detail-section-title">Membership</div>
@@ -2877,7 +2876,7 @@ async function openProfileScreen(uid) {
             ${hasCoach
               ? _roleCheck
               : hasPending
-                ? `<div style="display:flex;align-items:center;gap:8px"><span class="role-status-pending">Request pending</span><button class="role-status-btn" onclick="cancelCoachRequest()">Cancel</button></div>`
+                ? `<div style="display:flex;align-items:center;gap:8px"><span class="role-status-pending">Pending</span><button class="role-status-btn" onclick="cancelCoachRequest()">Cancel</button></div>`
                 : `<button class="role-status-btn" id="coach-request-view-btn" onclick="requestCoachStatusFromView()">Request →</button>`}
           </div>
           <div class="role-status-row">
@@ -2885,12 +2884,12 @@ async function openProfileScreen(uid) {
             ${hasProvider
               ? _roleCheck
               : hasPendingProvider
-                ? `<div style="display:flex;align-items:center;gap:8px"><span class="role-status-pending">Request pending</span><button class="role-status-btn" onclick="cancelProviderRequest()">Cancel</button></div>`
+                ? `<div style="display:flex;align-items:center;gap:8px"><span class="role-status-pending">Pending</span><button class="role-status-btn" onclick="cancelProviderRequest()">Cancel</button></div>`
                 : `<button class="role-status-btn" id="provider-request-view-btn" onclick="requestProviderStatusFromView()">Request →</button>`}
           </div>
           <div class="role-status-row role-status-row--dim">
             <span class="role-status-name">Admin</span>
-            ${roles.includes('admin') || roles.includes('owner') ? _roleCheck : _roleLocked}
+            ${roles.includes('admin') || roles.includes('owner') ? _roleCheck : ''}
           </div>
           <div class="role-status-row">
             <span class="role-status-name">Photo consent</span>
@@ -2933,7 +2932,7 @@ async function openProfileScreen(uid) {
                 <button class="role-action-approve" data-uid="${esc(targetUid)}" onclick="approveCoach(this,this.dataset.uid)">Approve</button>
                 <button class="role-action-reject"  data-uid="${esc(targetUid)}" onclick="rejectCoach(this,this.dataset.uid)">Reject</button>
               </div>`
-            : `<div class="role-action-btns">${hasCoach ? _activeTag : '<span class="role-status-locked">Not requested</span>'}
+            : `<div class="role-action-btns">${hasCoach ? _activeTag : ''}
                  ${_grantRevoke('coach', hasCoach, 'coach')}
                </div>`}
           </div>
@@ -2944,7 +2943,7 @@ async function openProfileScreen(uid) {
                 <button class="role-action-approve" data-uid="${esc(targetUid)}" onclick="approveProvider(this,this.dataset.uid)">Approve</button>
                 <button class="role-action-reject"  data-uid="${esc(targetUid)}" onclick="rejectProvider(this,this.dataset.uid)">Reject</button>
               </div>`
-            : `<div class="role-action-btns">${hasProvider ? _activeTag : '<span class="role-status-locked">Not requested</span>'}
+            : `<div class="role-action-btns">${hasProvider ? _activeTag : ''}
                  ${_grantRevoke('provider', hasProvider, 'provider')}
                </div>`}
           </div>
@@ -2956,17 +2955,17 @@ async function openProfileScreen(uid) {
                 <button class="role-action-reject"  data-uid="${esc(targetUid)}" onclick="rejectAdmin(this,this.dataset.uid)">Reject</button>
               </div>`
             : _isOwner ? `
-              <div class="role-action-btns">${hasAdmin ? _activeTag : '<span class="role-status-locked">—</span>'}
+              <div class="role-action-btns">${hasAdmin ? _activeTag : ''}
                 ${_grantRevoke('admin', hasAdmin, 'admin')}
               </div>`
-            : hasPendingAdmin ? `<span class="role-status-pending">Pending sudo approval</span>`
+            : hasPendingAdmin ? `<span class="role-status-pending">Pending</span>`
             : hasAdmin ? _activeTag
-            : `<span class="role-status-locked">—</span>`}
+            : ''}
           </div>
           ${_isOwner && !hasOwner ? `
           <div class="role-status-row">
             <span class="role-status-name">Sudo</span>
-            <div class="role-action-btns"><span class="role-status-locked">—</span>
+            <div class="role-action-btns">
               ${_grantRevoke('owner', false, 'owner')}
             </div>
           </div>` : _isOwner && hasOwner ? `
