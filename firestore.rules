@@ -19,6 +19,11 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roles', []).hasAny(['provider']);
     }
 
+    function isCoach() {
+      return request.auth != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roles', []).hasAny(['coach']);
+    }
+
     function isSessionCoach(sessionId) {
       return get(/databases/$(database)/documents/sessions/$(sessionId)).data.coachUid
              == request.auth.uid;
@@ -60,6 +65,11 @@ service cloud.firestore {
       allow create: if isAdmin()
                     || (isProvider()
                         && request.resource.data.providerUid == request.auth.uid
+                        && validSessionKeys())
+                    || (isCoach()
+                        && (request.resource.data.type == 'clinic' || request.resource.data.type == 'training')
+                        && request.resource.data.providerUid == request.auth.uid
+                        && request.resource.data.coachUid == request.auth.uid
                         && validSessionKeys());
       allow delete: if isAdmin()
                     || (isProvider() && resource.data.providerUid == request.auth.uid);

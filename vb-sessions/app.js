@@ -286,6 +286,10 @@ function _canCreate() {
   return _isAdmin || (_isProvider && _providerOnboardingComplete);
 }
 
+function _canCreateClinic() {
+  return _isAdmin || _canCreate() || (_isCoach && _providerOnboardingComplete);
+}
+
 function _setNav(mode, activeTab) {
   const tabsRow = document.getElementById('nav-tabs-row');
   const backBtn = document.getElementById('nav-back-btn');
@@ -341,6 +345,8 @@ function _updateAuthUI() {
   });
   const seriesFooter = document.getElementById('series-footer');
   if (seriesFooter) seriesFooter.style.display = _canCreate() ? '' : 'none';
+  const coachesFooter = document.getElementById('coaches-footer');
+  if (coachesFooter) coachesFooter.style.display = _canCreateClinic() ? '' : 'none';
   const tabsRow = document.getElementById('nav-tabs-row');
   if (tabsRow && !_currentUser) {
     tabsRow.style.display = 'none';
@@ -3248,7 +3254,7 @@ function _expandDates(startDateStr, repeat, endType, endCount, endDateStr) {
 }
 
 async function openSessionCreateInline() {
-  if (!_canCreate()) return;
+  if (!_canCreate() && !_canCreateClinic()) return;
   if (!_isAdmin && !_providerOnboardingComplete) {
     showToast('Set up payments in your profile before creating sessions.', 'error');
     return;
@@ -3427,6 +3433,20 @@ async function openSessionCreateInline() {
   if (_isAdmin) await _ieLoadCoachOptions('', '');
 }
 
+async function openClinicCreateInline() {
+  if (!_canCreateClinic()) return;
+  await openSessionCreateInline();
+  // Lock type to clinic for coaches who aren't admins
+  const typeEl = document.getElementById('ie-type');
+  if (typeEl && !_isAdmin) {
+    typeEl.value = 'clinic';
+    typeEl.disabled = true;
+  }
+  // Hide coach-related admin fields when the coach is the organiser
+  const coachRow = document.getElementById('ie-coach-row');
+  if (coachRow && _isCoach && !_isAdmin) coachRow.style.display = 'none';
+}
+
 function _ieUpdatePosTotal() {
   const totalEl = document.getElementById('ie-pos-total');
   if (!totalEl) return;
@@ -3514,12 +3534,15 @@ window._submitInlineCreate = async function() {
 
   if (dates.length === 0) { errorEl.textContent = 'Invalid repeat configuration.'; saveBtn.disabled = false; return; }
 
+  // When a coach (not admin, not provider) creates a clinic/training, they are both
+  // the organiser and the coach — set both providerUid and coachUid to their own uid.
+  const _isCoachOnly = _isCoach && !_isAdmin && !_isProvider;
   const base = {
     time:                 document.getElementById('ie-time').value,
     venue:                venueObj?.name || '',
     venueId,
-    coach:                coachVal,
-    coachUid:             coachUidVal,
+    coach:                _isCoachOnly ? (_currentUser.displayName || '') : coachVal,
+    coachUid:             _isCoachOnly ? _currentUser.uid : coachUidVal,
     level:                document.getElementById('ie-level').value,
     type:                 document.getElementById('ie-type').value,
     gender:               document.getElementById('ie-gender').value,
@@ -5529,6 +5552,8 @@ function openCoachesScreen() {
   showScreen('coaches');
   _setNav('primary', 'coaches');
   _setTitle('Coaches');
+  const coachesFooter = document.getElementById('coaches-footer');
+  if (coachesFooter) coachesFooter.style.display = _canCreateClinic() ? '' : 'none';
   renderCoaches();
 }
 
