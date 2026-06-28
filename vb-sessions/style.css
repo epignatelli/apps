@@ -729,13 +729,14 @@ body {
   margin-bottom: 4px;
 }
 .session-admin-group {
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 .session-admin-group-label {
   font-family: var(--sport); font-size: 10px; font-weight: 700;
   letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .6;
+  width: 100%;
 }
 .danger-btn {
   background: transparent;
@@ -951,7 +952,7 @@ body {
 .role-action-grant:hover, .role-action-revoke:hover { opacity: .75; }
 
 .profile-actions {
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px;
 }
 
 /* ── Session / coach payment history rows ────────────────────────────────── */
