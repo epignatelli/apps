@@ -4802,7 +4802,12 @@ async function openEditProfile() {
       cb.checked = posSet.has(cb.value);
     });
     _updateCoachRequestBtn(data);
-    _updateProviderRequestBtn(data);
+    const stripeField = document.getElementById('provider-stripe-field');
+    if (stripeField) {
+      const isProvider   = (data.roles || []).includes('provider');
+      const needsStripe  = isProvider && !data.providerOnboardingComplete;
+      stripeField.style.display = needsStripe ? '' : 'none';
+    }
     // Coach profile section — show only when user has coach role
     const coachSection = document.getElementById('coach-profile-section');
     if (coachSection) {
@@ -5010,33 +5015,6 @@ function _updateCoachRequestBtn(data) {
   }
 }
 
-function _updateProviderRequestBtn(data) {
-  const field       = document.getElementById('provider-request-field');
-  const stripeField = document.getElementById('provider-stripe-field');
-  const btn         = document.getElementById('provider-request-btn');
-  if (!field || !btn) return;
-  const roles      = data.roles || [];
-  const isProvider = roles.includes('provider');
-  const isPending  = _isOpenRequest(data.providerRequest) && !isProvider;
-  const needsStripe = isProvider && !data.providerOnboardingComplete;
-
-  // Request row: hidden once approved as provider
-  field.style.display = isProvider ? 'none' : '';
-  // Stripe setup row: only shown after provider role is granted
-  if (stripeField) stripeField.style.display = needsStripe ? '' : 'none';
-
-  if (!isProvider) {
-    if (isPending) {
-      btn.textContent = 'Host request pending';
-      btn.disabled    = true;
-      btn.className   = 'coach-request-btn pending';
-    } else {
-      btn.textContent = 'Host with us →';
-      btn.disabled    = false;
-      btn.className   = 'coach-request-btn';
-    }
-  }
-}
 
 // ─── Policy overlay ────────────────────────────────────────────────────────────
 function openPolicy() {
