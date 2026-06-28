@@ -1129,6 +1129,7 @@ body {
 /* ─── Session level badges ────────────────────────────────────────────── */
 .session-badge.level-any          { background: var(--surface2);           color: var(--muted);  }
 .session-badge.level-beginner     { background: var(--green-bg);           color: var(--green);  }
+.session-badge.level-improver     { background: rgba(52,211,153,.13);      color: #34d399;       }
 .session-badge.level-intermediate { background: rgba(96,165,250,.13);      color: #93c5fd;       }
 .session-badge.level-advanced     { background: rgba(251,146,60,.13);      color: #fb923c;       }
 .session-badge.level-competitive  { background: rgba(239,68,68,.12);       color: #f87171;       }

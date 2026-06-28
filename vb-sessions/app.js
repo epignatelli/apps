@@ -496,7 +496,7 @@ async function _routeFromHash() {
   else { renderHome(); }
 }
 
-const _LEVEL_LABELS  = { '': 'Level', any: 'Any level', beginner: 'Beginner', intermediate: 'Intermed.', advanced: 'Advanced', competitive: 'Competit.' };
+const _LEVEL_LABELS  = { '': 'Level', any: 'Any level', beginner: 'Beginner', improver: 'Improver', intermediate: 'Advanced', advanced: 'Competit.', competitive: 'Elite' };
 const _GENDER_LABELS = { '': 'Gender', mixed: 'Mixed', women: 'Women', men: 'Men' };
 
 function _updateFbarBtn(type, isActive, label) {
@@ -854,7 +854,7 @@ async function renderHome() {
     const providerBannerHtml = _activeProviderFilter
       ? `<div class="provider-banner"><span class="provider-banner-label">My sessions</span><button class="provider-banner-clear" onclick="goHome()">← All sessions</button></div>`
       : '';
-    const levelLabels = { any: 'Any level', beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' };
+    const levelLabels = { any: 'Any level', beginner: 'Beginner', improver: 'Improver', intermediate: 'Advanced', advanced: 'Competitive', competitive: 'Elite' };
     const levelBannerHtml = _activeLevelFilter.size
       ? `<div class="filter-active-label">Level: <strong>${[..._activeLevelFilter].map(l => levelLabels[l] || l).join(', ')}</strong></div>`
       : '';
@@ -1012,7 +1012,7 @@ function _renderSessionCard(s) {
   const timeStr     = s.time || '';
   const costStr     = _formatPlayerPrice(s.cost, s.absorbFee);
   const countStr    = s.attendeeCount != null ? `${s.attendeeCount}/${s.maxPlayers}` : `0/${s.maxPlayers}`;
-  const levelLabel  = { any: 'Any level', beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[s.level] || 'Any level';
+  const levelLabel  = { any: 'Any level', beginner: 'Beginner', improver: 'Improver', intermediate: 'Advanced', advanced: 'Competitive', competitive: 'Elite' }[s.level] || 'Any level';
   const typeLabel   = SESSION_TYPES.find(t => t.value === s.type)?.label || '';
   const genderLabel = SESSION_GENDERS.find(g => g.value === s.gender)?.label || '';
   return `
@@ -1354,7 +1354,7 @@ function _renderDetail(session, attendees, isAttending, waitingList, myWaitingLi
   const isFull         = spotsLeft === 0 && !isAttending;
   const canStart       = _isAdmin || (_currentUser && session.coachUid && session.coachUid === _currentUser.uid);
   const deadlinePassed = session.registrationDeadline && session.registrationDeadline.toDate() < new Date();
-  const levelLabel     = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[session.level] || '';
+  const levelLabel     = { beginner: 'Beginner', improver: 'Intermediate', intermediate: 'Advanced', advanced: 'Competitive', competitive: 'Elite' }[session.level] || '';
   const deadlineStr    = session.registrationDeadline
     ? session.registrationDeadline.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
     : '';
@@ -2746,7 +2746,7 @@ async function openProfileScreen(uid) {
 
     const posLabels   = { setter: 'Setter', hitter: 'Hitter', middle: 'Middle', libero: 'Libero' };
     const genderLabel = { man: 'Man', woman: 'Woman', nonbinary: 'Non-binary' }[u.gender] || '';
-    const levelLabel  = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' }[u.level] || '';
+    const levelLabel  = { beginner: 'Beginner', improver: 'Intermediate', intermediate: 'Advanced', advanced: 'Competitive', competitive: 'Elite' }[u.level] || '';
     const initials    = (u.name || u.email || '?')[0].toUpperCase();
     const roleOrder   = ['owner', 'admin', 'provider', 'coach'];
     const displayRoles = roleOrder.filter(r => roles.includes(r));
@@ -3239,9 +3239,10 @@ async function openSessionCreateInline() {
           <select class="field-input field-select" id="ie-level">
             <option value="">Any level</option>
             <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-            <option value="competitive">Competitive</option>
+            <option value="improver">Intermediate</option>
+            <option value="intermediate">Advanced</option>
+            <option value="advanced">Competitive</option>
+            <option value="competitive">Elite</option>
           </select>
         </div>
       </div>` : `
@@ -3250,9 +3251,10 @@ async function openSessionCreateInline() {
         <select class="field-input field-select" id="ie-level">
           <option value="">Any level</option>
           <option value="beginner">Beginner</option>
-          <option value="intermediate">Intermediate</option>
-          <option value="advanced">Advanced</option>
-          <option value="competitive">Competitive</option>
+          <option value="improver">Intermediate</option>
+          <option value="intermediate">Advanced</option>
+          <option value="advanced">Competitive</option>
+          <option value="competitive">Elite</option>
         </select>
       </div>`}
       <div class="field-row">
@@ -3469,7 +3471,7 @@ async function openSessionEditInline(sessionId) {
   const seriesOpts = '<option value="">None</option>' + _allSeries.map(sr =>
     `<option value="${sr.id}"${sr.id === s.seriesId ? ' selected' : ''}>${esc(sr.name)}</option>`
   ).join('');
-  const levelOpts = [['','Any level'],['beginner','Beginner'],['intermediate','Intermediate'],['advanced','Advanced'],['competitive','Competitive']]
+  const levelOpts = [['','Any level'],['beginner','Beginner'],['improver','Intermediate'],['intermediate','Advanced'],['advanced','Competitive'],['competitive','Elite']]
     .map(([v,l]) => `<option value="${v}"${(s.level||'')===v?' selected':''}>${l}</option>`).join('');
   const typeOpts  = SESSION_TYPES.map(t =>
     `<option value="${t.value}"${(s.type||'game')===t.value?' selected':''}>${t.label}</option>`).join('');
@@ -4222,7 +4224,7 @@ function _renderReport(report, session) {
 
   // ── Session info ──────────────────────────────────────────────────────────────
   const closedDate = report.closedAt?.toDate ? _formatDate(report.closedAt) : '';
-  const levelLabels = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' };
+  const levelLabels = { beginner: 'Beginner', improver: 'Intermediate', intermediate: 'Advanced', advanced: 'Competitive', competitive: 'Elite' };
 
   content.innerHTML = `
     <div class="run-section">
@@ -5028,10 +5030,11 @@ function _renderInsightsUI(container) {
 // ─── Level info ────────────────────────────────────────────────────────────────
 
 const _LEVEL_INFO = [
-  { key: 'beginner',     label: 'Beginner',     lva: 'Recreational',           desc: 'Casual play, no league experience needed. Focus on learning and fun.' },
-  { key: 'intermediate', label: 'Intermediate', lva: 'LVA Division 3',         desc: 'Some competitive experience. Comfortable with game rotations and basic systems.' },
-  { key: 'advanced',     label: 'Advanced',     lva: 'LVA Divisions 1–2',      desc: 'Regular league players. Strong fundamentals, reads the game well.' },
-  { key: 'competitive',  label: 'Competitive',  lva: 'LVA Première / Superleague', desc: 'Elite level. National league or equivalent experience.' },
+  { key: 'beginner',     label: 'Beginner',     lva: 'Recreational',               desc: 'New to volleyball or just starting out. Learning the rules and basic technique. Focus on fun and development.' },
+  { key: 'improver',     label: 'Intermediate', lva: 'Recreational / LVA Div 3',   desc: 'You play regularly and are comfortable on court. Understand basic rotations and can perform core skills with some consistency.' },
+  { key: 'intermediate', label: 'Advanced',     lva: 'LVA Division 3',             desc: 'Experienced club player. Comfortable with 3-touch play, rotations, and position-specific skills. May not have played on an organised team.' },
+  { key: 'advanced',     label: 'Competitive',  lva: 'LVA Divisions 1–2',          desc: 'Played on an organised team with coaching. Strong fundamentals, some advanced skills, and a clear positional role.' },
+  { key: 'competitive',  label: 'Elite',        lva: 'LVA Première · Superleague', desc: 'College, club, semi-pro or international experience. High volleyball IQ and the ability to perform consistently under pressure.' },
 ];
 
 window.openLevelInfo = function(activeLevel) {
