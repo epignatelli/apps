@@ -165,7 +165,8 @@ service cloud.firestore {
                          .affectedKeys().hasOnly([
                            'name','email','photoURL','updatedAt',
                            'gender','level','positions','coachRequest','providerRequest',
-                           'photoConsent','termsAccepted','ageConsent'
+                           'photoConsent','termsAccepted','ageConsent',
+                           'coachBio','coachPositions','coachLevels','coachStyles','coachRate','coach1to1Enabled'
                          ]);
       allow delete: if isAdmin();
 

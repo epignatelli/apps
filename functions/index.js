@@ -53,15 +53,21 @@ async function _resolveCallerRole(db, decoded) {
 async function _syncPublicProfile(db, uid, data) {
   const publicRoles = (data.roles || ['player']).filter(r => ['player', 'coach', 'provider'].includes(r));
   await db.collection('publicProfiles').doc(uid).set({
-    name:       data.name       || null,
-    photoURL:   data.photoURL   || null,
-    level:      data.level      || null,
-    gender:     data.gender     || null,
-    positions:  data.positions  || [],
-    createdAt:  data.createdAt  || null,
-    roles:      publicRoles,
-    isProvider: publicRoles.includes('provider'),
-    isCoach:    publicRoles.includes('coach'),
+    name:              data.name              || null,
+    photoURL:          data.photoURL          || null,
+    level:             data.level             || null,
+    gender:            data.gender            || null,
+    positions:         data.positions         || [],
+    createdAt:         data.createdAt         || null,
+    roles:             publicRoles,
+    isProvider:        publicRoles.includes('provider'),
+    isCoach:           publicRoles.includes('coach'),
+    coachBio:          data.coachBio          || null,
+    coachPositions:    data.coachPositions     || [],
+    coachLevels:       data.coachLevels        || [],
+    coachStyles:       data.coachStyles        || [],
+    coachRate:         data.coachRate          != null ? data.coachRate : null,
+    coach1to1Enabled:  data.coach1to1Enabled   || false,
   }, { merge: false });
 }
 

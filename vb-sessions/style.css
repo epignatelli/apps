@@ -1308,3 +1308,25 @@ body {
                             color: #000; }
 .tbuilder-card.my-vote { border-color: rgba(240,165,0,.5);
                           background: rgba(240,165,0,.06); }
+
+/* ── Coach directory & profile ───────────────────────────────────────────── */
+.check-group {
+  display: flex; flex-wrap: wrap; gap: 6px 12px;
+  margin-top: 4px;
+}
+.check-opt {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 13px; color: var(--text); cursor: pointer;
+  user-select: none;
+}
+.check-opt input[type="checkbox"] {
+  accent-color: var(--green);
+  width: 14px; height: 14px; flex-shrink: 0; cursor: pointer;
+}
+
+.coach-card-meta { color: var(--muted); }
+
+.coach-section { }
+.coach-section .detail-description {
+  font-size: 14px; color: var(--muted); line-height: 1.6;
+}

@@ -471,6 +471,7 @@ async function _routeFromHash() {
   if (hash.startsWith('venue/')) { if (_isAdmin) { await openVenueDetail(hash.slice(6)); } else renderHome(); return; }
   if (hash === 'admin')         { if (_isAdmin) openAdminScreen();    else renderHome(); return; }
   if (hash === 'series')        { openSeriesScreen(); return; }
+  if (hash === 'coaches')       { openCoachesScreen(); return; }
   if (hash === 'coach') {
     if (_currentUser) { openProfileScreen(); }
     else { _pendingCoachRequest = true; goHome(); showToast('Sign in to request coach status'); }
@@ -2945,8 +2946,9 @@ async function openProfileScreen(uid) {
     const showHistory = isOwn || _isAdmin;
     const showCoach   = (hasCoach || roles.includes('admin') || roles.includes('owner')) && _isAdmin;
 
-    // Fetch all data in parallel: coach sessions, all series docs, all session docs
-    const [coachSessionsSnap, allSeriesSnap, allSessionsSnap] = await Promise.all([
+    // Fetch all data in parallel: coach sessions, all series docs, all session docs, upcoming clinics
+    const todayTs = firebase.firestore.Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
+    const [coachSessionsSnap, allSeriesSnap, allSessionsSnap, upcomingClinicsSnap] = await Promise.all([
       showCoach
         ? _sessionsRef().where('coachUid', '==', targetUid).where('status', '==', 'closed').orderBy('date', 'desc').limit(25).get().catch(() => null)
         : Promise.resolve(null),
@@ -2955,6 +2957,9 @@ async function openProfileScreen(uid) {
         : Promise.resolve(null),
       showHistory
         ? _sessionsRef().orderBy('date', 'asc').get().catch(() => null)
+        : Promise.resolve(null),
+      hasCoach
+        ? _sessionsRef().where('coachUid', '==', targetUid).where('date', '>=', todayTs).orderBy('date', 'asc').limit(3).get().catch(() => null)
         : Promise.resolve(null),
     ]);
 
@@ -3058,6 +3063,42 @@ async function openProfileScreen(uid) {
         <div class="profile-history-list">${coachPayRows}</div>
       </div>` : '';
 
+    // ── Coach public section ─────────────────────────────────────────────────
+    const _posLabel  = { setter: 'Setter', hitter: 'Hitter', middle: 'Middle', libero: 'Libero' };
+    const _lvlLabel  = { beginner: 'Beginner', improver: 'Improver', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' };
+    const coachProfileSection = hasCoach ? (() => {
+      const bio        = u.coachBio;
+      const posMeta    = (u.coachPositions || []).map(p => _posLabel[p] || p).join(', ');
+      const lvlMeta    = (u.coachLevels    || []).map(l => _lvlLabel[l] || l).join(', ');
+      const styleMeta  = (u.coachStyles    || []).join(', ');
+      const rateLine   = u.coach1to1Enabled
+        ? (u.coachRate != null ? `£${u.coachRate}/hr · Available for 1-1 sessions` : 'Available for 1-1 sessions')
+        : '';
+      const clinicRows = upcomingClinicsSnap?.docs.map(d => {
+        const s = d.data();
+        return `<div class="history-row clickable-row" onclick="openSession('${d.id}')">
+          <span class="history-date">${_formatDate(s.date)}${s.time ? ` · ${s.time}` : ''}</span>
+          <span class="history-venue">${esc(s.venue || '—')}</span>
+          <span class="history-cost">${s.type ? esc(s.type) : 'Clinic'}</span>
+        </div>`;
+      }) || [];
+      return `
+        <div class="detail-section coach-section">
+          <div class="detail-section-title">Coach</div>
+          ${bio ? `<div class="detail-description">${esc(bio)}</div>` : ''}
+          <div class="detail-meta-grid">
+            ${posMeta   ? `<div class="detail-meta-row"><span class="detail-meta-label">Positions</span><span>${esc(posMeta)}</span></div>` : ''}
+            ${lvlMeta   ? `<div class="detail-meta-row"><span class="detail-meta-label">Levels</span><span>${esc(lvlMeta)}</span></div>` : ''}
+            ${styleMeta ? `<div class="detail-meta-row"><span class="detail-meta-label">Style</span><span>${esc(styleMeta)}</span></div>` : ''}
+            ${rateLine  ? `<div class="detail-meta-row"><span class="detail-meta-label">1-1</span><span>${esc(rateLine)}</span></div>` : ''}
+          </div>
+          ${clinicRows.length ? `
+            <div class="detail-section-title" style="margin-top:4px">Upcoming clinics</div>
+            <div class="profile-history-list">${clinicRows.join('')}</div>
+          ` : ''}
+        </div>`;
+    })() : '';
+
     body.innerHTML = `
       <div class="profile-screen-card">
         <div class="profile-hero">
@@ -3068,6 +3109,7 @@ async function openProfileScreen(uid) {
           ${roleBadges ? `<div class="profile-role-badges">${roleBadges}</div>` : ''}
         </div>
         ${metaRows ? `<div class="detail-section"><div class="detail-meta-grid">${metaRows}</div></div>` : ''}
+        ${coachProfileSection}
         ${rolesSection}
         ${adminSection}
         ${ownActions}
@@ -4474,6 +4516,23 @@ async function openEditProfile() {
     });
     _updateCoachRequestBtn(data);
     _updateProviderRequestBtn(data);
+    // Coach profile section — show only when user has coach role
+    const coachSection = document.getElementById('coach-profile-section');
+    if (coachSection) {
+      const isCoach = (data.roles || []).includes('coach');
+      coachSection.style.display = isCoach ? '' : 'none';
+      if (isCoach) {
+        document.getElementById('pf-coach-bio').value      = data.coachBio || '';
+        document.getElementById('pf-coach-rate').value     = data.coachRate != null ? data.coachRate : '';
+        document.getElementById('pf-coach-1to1').checked   = !!data.coach1to1Enabled;
+        const coachPosSet   = new Set(data.coachPositions || []);
+        const coachLvlSet   = new Set(data.coachLevels    || []);
+        const coachStyleSet = new Set(data.coachStyles     || []);
+        document.querySelectorAll('.pf-coach-pos').forEach(cb  => { cb.checked = coachPosSet.has(cb.value);   });
+        document.querySelectorAll('.pf-coach-lvl').forEach(cb  => { cb.checked = coachLvlSet.has(cb.value);   });
+        document.querySelectorAll('.pf-coach-style').forEach(cb => { cb.checked = coachStyleSet.has(cb.value); });
+      }
+    }
   } catch(e) {
     console.error('Load profile failed:', e);
   }
@@ -4500,6 +4559,20 @@ async function saveProfile() {
   const btn = document.getElementById('edit-profile-save-btn');
   btn.disabled = true;
 
+  // Collect coach fields if coach section is visible
+  const coachSection = document.getElementById('coach-profile-section');
+  const coachVisible = coachSection && coachSection.style.display !== 'none';
+  const coachData = coachVisible ? {
+    coachBio:         document.getElementById('pf-coach-bio').value.trim() || null,
+    coachPositions:   Array.from(document.querySelectorAll('.pf-coach-pos:checked')).map(el => el.value),
+    coachLevels:      Array.from(document.querySelectorAll('.pf-coach-lvl:checked')).map(el => el.value),
+    coachStyles:      Array.from(document.querySelectorAll('.pf-coach-style:checked')).map(el => el.value),
+    coachRate:        document.getElementById('pf-coach-rate').value !== ''
+                        ? Number(document.getElementById('pf-coach-rate').value)
+                        : null,
+    coach1to1Enabled: document.getElementById('pf-coach-1to1').checked,
+  } : {};
+
   try {
     await _userRef(_currentUser.uid).update({
       name,
@@ -4507,6 +4580,7 @@ async function saveProfile() {
       level:     level  || null,
       positions,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      ...coachData,
     });
     closeEditProfile();
     showToast('Profile updated.');
@@ -5400,6 +5474,54 @@ function openSeriesScreen() {
   const footer = document.getElementById('series-footer');
   if (footer) footer.style.display = _canCreate() ? '' : 'none';
   renderSeries();
+}
+
+// ── Coaches directory ──────────────────────────────────────────────────────────
+function openCoachesScreen() {
+  _setHash('coaches');
+  showScreen('coaches');
+  _setNav('primary', 'coaches');
+  _setTitle('Coaches');
+  renderCoaches();
+}
+
+async function renderCoaches() {
+  const list = document.getElementById('coaches-list');
+  if (!list) return;
+  list.innerHTML = '<div class="home-empty">Loading…</div>';
+  try {
+    const snap = await getDb().collection('publicProfiles')
+      .where('isCoach', '==', true)
+      .orderBy('name')
+      .get();
+    if (snap.empty) {
+      list.innerHTML = '<div class="home-empty">No coaches listed yet.</div>';
+      return;
+    }
+    const _posLabel  = { setter: 'Setter', hitter: 'Hitter', middle: 'Middle', libero: 'Libero' };
+    const _lvlLabel  = { beginner: 'Beginner', improver: 'Improver', intermediate: 'Intermediate', advanced: 'Advanced', competitive: 'Competitive' };
+    list.innerHTML = snap.docs.map(d => {
+      const u        = d.data();
+      const initials = (u.name || '?')[0].toUpperCase();
+      const avatar   = u.photoURL
+        ? `<img class="user-avatar" src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer" />`
+        : `<div class="user-avatar user-avatar--initials">${esc(initials)}</div>`;
+      const posMeta  = (u.coachPositions || []).map(p => _posLabel[p] || p).join(', ');
+      const lvlMeta  = (u.coachLevels    || []).map(l => _lvlLabel[l] || l).join(', ');
+      const rateMeta = u.coach1to1Enabled && u.coachRate != null ? ` · £${u.coachRate}/hr` : '';
+      const metaLine = [posMeta, lvlMeta].filter(Boolean).join(' · ') + rateMeta;
+      return `<div class="user-row" onclick="openProfileScreen('${esc(d.id)}')">
+        ${avatar}
+        <div class="user-info">
+          <div class="user-name">${esc(u.name || '—')}</div>
+          ${metaLine ? `<div class="user-meta coach-card-meta">${esc(metaLine)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('Load coaches failed:', e);
+    list.innerHTML = '<div class="home-empty">Couldn\'t load coaches.</div>';
+  }
 }
 
 async function renderSeries() {

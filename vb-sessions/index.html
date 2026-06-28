@@ -49,6 +49,7 @@
   <div class="nav-tabs-row" id="nav-tabs-row" style="display:none">
     <button class="nav-tab"            data-tab="home"     onclick="goHome()">Sessions</button>
     <button class="nav-tab"            data-tab="series"   onclick="openSeriesScreen()">Passes</button>
+    <button class="nav-tab"            data-tab="coaches"  onclick="openCoachesScreen()">Coaches</button>
     <button class="nav-tab admin-tab"  data-tab="finances" onclick="openFinancesScreen()">Finances</button>
     <button class="nav-tab admin-tab"  data-tab="insights" onclick="openInsightsScreen()">Insights</button>
     <button class="nav-tab admin-tab"  data-tab="admin"    onclick="openAdminScreen()">Admin</button>
@@ -202,6 +203,15 @@
     <button class="cta-btn" onclick="openSeriesCreateInline()">+ New pass</button>
   </div>
 
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN — COACHES DIRECTORY
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-coaches">
+  <div class="users-content" id="coaches-list">
+    <div class="home-empty">Loading…</div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════
@@ -377,6 +387,49 @@
       <div class="field" id="provider-stripe-field" style="display:none">
         <button class="cta-btn" id="provider-stripe-btn" onclick="startProviderOnboarding()">Set up payments →</button>
         <div class="field-hint">Connect your bank account to receive payments from your sessions.</div>
+      </div>
+      <div id="coach-profile-section" style="display:none">
+        <div class="field">
+          <label class="field-label">Bio</label>
+          <textarea class="field-input field-textarea" id="pf-coach-bio" maxlength="280" placeholder="What you coach, your approach, experience…"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">Positions you coach</label>
+          <div class="check-group">
+            <label class="check-opt"><input type="checkbox" class="pf-coach-pos" value="setter"> Setter</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-pos" value="hitter"> Hitter</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-pos" value="middle"> Middle</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-pos" value="libero"> Libero</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Levels you coach</label>
+          <div class="check-group">
+            <label class="check-opt"><input type="checkbox" class="pf-coach-lvl" value="beginner"> Beginner</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-lvl" value="improver"> Improver</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-lvl" value="intermediate"> Intermediate</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-lvl" value="advanced"> Advanced</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-lvl" value="competitive"> Competitive</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Coaching style</label>
+          <div class="check-group">
+            <label class="check-opt"><input type="checkbox" class="pf-coach-style" value="Technical"> Technical</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-style" value="Tactical"> Tactical</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-style" value="Physical"> Physical</label>
+            <label class="check-opt"><input type="checkbox" class="pf-coach-style" value="Mental"> Mental</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">1-1 rate (£/hr)</label>
+          <input class="field-input" type="number" id="pf-coach-rate" min="0" step="5" placeholder="e.g. 50" />
+        </div>
+        <div class="field">
+          <label class="field-label" style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="pf-coach-1to1" /> Available for 1-1 sessions
+          </label>
+        </div>
       </div>
     </div>
     <div class="form-error" id="edit-profile-error"></div>
