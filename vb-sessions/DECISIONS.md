@@ -4,6 +4,28 @@ Technical and product decisions that aren't obvious from the code, with the reas
 
 ---
 
+## ⚠️ TECH DEBT — Session level keys are misleading in Firestore
+
+**Files:** `app.js` (all label maps, select options, `_LEVEL_INFO`), `style.css` (`.level-*` badge classes), `levels.html`
+
+The `level` field stored in Firestore does **not** match what the UI shows. The display names were renamed without migrating the underlying data:
+
+| Firestore value | UI display name |
+|---|---|
+| `"beginner"` | Beginner |
+| `"improver"` | Intermediate |
+| `"intermediate"` | Advanced ← looks like "Intermediate" |
+| `"advanced"` | Competitive ← looks like "Advanced" |
+| `"competitive"` | Elite ← looks like "Competitive" |
+
+**Risk:** any code that reads `level` from Firestore and interprets the value literally — Cloud Functions, admin scripts, analytics queries — will silently use the wrong meaning. `"intermediate"` is not Intermediate; it is Advanced.
+
+**Why not fixed yet:** requires a live data migration across all `sessions` and `users` documents, plus coordinated deploy of new key names everywhere. Deferred to avoid risk.
+
+**What the fix looks like when the time comes:** rename keys to `beginner / intermediate / advanced / competitive / elite`, migrate all Firestore docs in a one-time script, update all label maps and CSS class names in one atomic deploy.
+
+---
+
 ## Role request model
 
 **Files:** `app.js` (`_requestObj`, `_isOpenRequest`, `_requestClosed`), `functions/index.js` (`handleRequestAction`, `_createRequestTokens`)
