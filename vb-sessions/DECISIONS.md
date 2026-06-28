@@ -20,7 +20,9 @@ The `level` field stored in Firestore does **not** match what the UI shows. The 
 
 **Risk:** any code that reads `level` from Firestore and interprets the value literally — Cloud Functions, admin scripts, analytics queries — will silently use the wrong meaning. `"intermediate"` is not Intermediate; it is Advanced.
 
-**Why not fixed yet:** requires a live data migration across all `sessions` and `users` documents, plus coordinated deploy of new key names everywhere. Deferred to avoid risk.
+**Why not fixed yet:** requires a live data migration across all `sessions` and `users` documents, plus coordinated deploy of new key names everywhere. Deferred to avoid risk during active use.
+
+**When to fix:** just before public launch, while the database is still empty (no real sessions). At that point it's just a find-and-replace in code — no data migration needed.
 
 **What the fix looks like when the time comes:** rename keys to `beginner / intermediate / advanced / competitive / elite`, migrate all Firestore docs in a one-time script, update all label maps and CSS class names in one atomic deploy.
 
