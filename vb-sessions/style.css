@@ -1352,6 +1352,22 @@ body {
 }
 
 .coach-section { }
+details.detail-section { display: block; }
+details.detail-section > * + * { margin-top: 12px; }
+
+.collapsible-title {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.collapsible-title::-webkit-details-marker { display: none; }
+.collapsible-title::after {
+  content: '›'; font-size: 18px; line-height: 1;
+  color: var(--muted); transform: rotate(90deg);
+  transition: transform 200ms ease;
+  display: inline-block;
+}
+details:not([open]) .collapsible-title::after { transform: rotate(0deg); }
+
 .coach-stripe-cta {
   margin-top: 12px; width: 100%;
   background: var(--amber-bg); border: 1px solid rgba(240,165,0,.4);

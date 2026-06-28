@@ -3137,8 +3137,8 @@ async function openProfileScreen(uid) {
         </div>`;
       }) || [];
       return `
-        <div class="detail-section coach-section">
-          <div class="detail-section-title">Coach</div>
+        <details class="detail-section coach-section" open>
+          <summary class="detail-section-title collapsible-title">Coach</summary>
           ${bio ? `<div class="detail-description">${esc(bio)}</div>` : ''}
           <div class="detail-meta-grid">
             ${posMeta    ? `<div class="detail-meta-row"><span class="detail-meta-label">Positions</span><span>${esc(posMeta)}</span></div>` : ''}
@@ -3146,14 +3146,14 @@ async function openProfileScreen(uid) {
             ${styleMeta  ? `<div class="detail-meta-row"><span class="detail-meta-label">Style</span><span>${esc(styleMeta)}</span></div>` : ''}
             ${rateLine   ? `<div class="detail-meta-row"><span class="detail-meta-label">1-1</span><span>${esc(rateLine)}</span></div>` : ''}
             ${availMeta  ? `<div class="detail-meta-row"><span class="detail-meta-label">Availability</span><span>${esc(availMeta)}</span></div>` : ''}
-          ${isOwn && u.providerOnboardingComplete ? `<div class="detail-meta-row"><span class="detail-meta-label">Payments</span><span class="role-status-active">Connected</span></div>` : ''}
+            ${isOwn && u.providerOnboardingComplete ? `<div class="detail-meta-row"><span class="detail-meta-label">Payments</span><span class="role-status-active">Connected</span></div>` : ''}
           </div>
           ${isOwn && !u.providerOnboardingComplete ? `<button class="cta-btn coach-stripe-cta" onclick="startProviderOnboarding(this)">Connect Stripe to receive payments →</button>` : ''}
           ${clinicRows.length ? `
             <div class="detail-section-title" style="margin-top:4px">Upcoming clinics</div>
             <div class="profile-history-list">${clinicRows.join('')}</div>
           ` : ''}
-        </div>`;
+        </details>`;
     })() : '';
 
     // ── Book a 1-1 button (player viewing another coach's profile) ──────────────
