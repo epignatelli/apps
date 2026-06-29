@@ -116,7 +116,7 @@ function toggleBestOf() {
 }
 
 function cycleSetPoints() {
-  const seq = [25, 21, 15];
+  const seq = [25, 21, 18, 15];
   const i = seq.indexOf(_state.setPoints);
   _state.setPoints = seq[(i + 1) % seq.length];
   _save();
