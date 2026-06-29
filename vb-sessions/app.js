@@ -3031,8 +3031,9 @@ async function openProfileScreen(uid) {
                 <button class="role-action-approve" data-uid="${esc(targetUid)}" onclick="approveCoach(this,this.dataset.uid)">Approve</button>
                 <button class="role-action-reject"  data-uid="${esc(targetUid)}" onclick="rejectCoach(this,this.dataset.uid)">Reject</button>
               </div>`
-            : `<div class="role-action-btns">${hasCoach ? _activeTag : ''}
+            : `<div class="role-action-btns">
                  ${_grantRevoke('coach', hasCoach, 'coach')}
+                 ${hasCoach ? _activeTag : ''}
                </div>`}
           </div>
           <div class="role-status-row">
@@ -3042,8 +3043,9 @@ async function openProfileScreen(uid) {
                 <button class="role-action-approve" data-uid="${esc(targetUid)}" onclick="approveProvider(this,this.dataset.uid)">Approve</button>
                 <button class="role-action-reject"  data-uid="${esc(targetUid)}" onclick="rejectProvider(this,this.dataset.uid)">Reject</button>
               </div>`
-            : `<div class="role-action-btns">${hasProvider ? _activeTag : ''}
+            : `<div class="role-action-btns">
                  ${_grantRevoke('provider', hasProvider, 'provider')}
+                 ${hasProvider ? _activeTag : ''}
                </div>`}
           </div>
           <div class="role-status-row">
@@ -3053,8 +3055,9 @@ async function openProfileScreen(uid) {
                 <button class="role-action-approve" data-uid="${esc(targetUid)}" onclick="approveReferee(this,this.dataset.uid)">Approve</button>
                 <button class="role-action-reject"  data-uid="${esc(targetUid)}" onclick="rejectReferee(this,this.dataset.uid)">Reject</button>
               </div>`
-            : `<div class="role-action-btns">${hasReferee ? _activeTag : ''}
+            : `<div class="role-action-btns">
                  ${_grantRevoke('referee', hasReferee, 'referee')}
+                 ${hasReferee ? _activeTag : ''}
                </div>`}
           </div>
           <div class="role-status-row">
@@ -3065,8 +3068,9 @@ async function openProfileScreen(uid) {
                 <button class="role-action-reject"  data-uid="${esc(targetUid)}" onclick="rejectAdmin(this,this.dataset.uid)">Reject</button>
               </div>`
             : _isOwner ? `
-              <div class="role-action-btns">${hasAdmin ? _activeTag : ''}
+              <div class="role-action-btns">
                 ${_grantRevoke('admin', hasAdmin, 'admin')}
+                ${hasAdmin ? _activeTag : ''}
               </div>`
             : hasPendingAdmin ? `<span class="role-status-pending">Pending</span>`
             : hasAdmin ? _activeTag
