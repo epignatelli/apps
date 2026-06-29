@@ -151,25 +151,38 @@ function editName(e, team) {
   input.focus();
   input.select();
 
-  const commit = () => {
-    _state[key] = input.value.trim() || old;
+  let done = false;
+  const commit = (val) => {
+    if (done) return;
+    done = true;
+    const saved = ((val !== undefined ? val : input.value) || '').trim() || old;
+    _state[key] = saved;
     _save();
     document.removeEventListener('touchstart', onOutside, true);
     document.removeEventListener('mousedown',  onOutside, true);
+    // Restore span directly — render() can't find #name-* while the input holds its place
+    const span = document.createElement('span');
+    span.className = 'team-name';
+    span.id        = `name-${team}`;
+    span.setAttribute('onclick', `editName(event,'${team}')`);
+    span.textContent = saved;
+    input.replaceWith(span);
     render();
   };
 
   const onOutside = ev => {
-    if (!input.contains(ev.target)) input.blur();
+    if (!input.contains(ev.target)) {
+      ev.preventDefault(); // prevent the tap from also scoring
+      commit();
+    }
   };
 
-  input.addEventListener('blur', commit, { once: true });
+  input.addEventListener('blur', () => commit());
   input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
-    if (ev.key === 'Escape') { input.value = old; input.blur(); }
+    if (ev.key === 'Enter')  { ev.preventDefault(); commit(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); commit(old); }
   });
 
-  // Use capture so we hear the tap before the panel's onclick fires
   document.addEventListener('touchstart', onOutside, true);
   document.addEventListener('mousedown',  onOutside, true);
 }
