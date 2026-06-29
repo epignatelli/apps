@@ -1917,7 +1917,7 @@ exports.updateUserRole = functions
       if (!uid || !role || !['add', 'remove'].includes(action))
         return res.status(400).json({ error: 'Missing or invalid fields.' });
 
-      const ADMIN_ROLES = ['coach', 'provider'];
+      const ADMIN_ROLES = ['coach', 'provider', 'referee'];
       const OWNER_ROLES = ['admin'];
       if (![...ADMIN_ROLES, ...OWNER_ROLES].includes(role))
         return res.status(400).json({ error: 'Invalid role.' });

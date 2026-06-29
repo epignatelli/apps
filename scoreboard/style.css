@@ -1,0 +1,298 @@
+:root {
+  --bg:      #111111;
+  --surface: #1a1a1a;
+  --border:  rgba(255,255,255,.1);
+  --text:    #f5f5f0;
+  --muted:   #555;
+  --accent:  #FFD600;
+  --bar-h:   48px;
+  --foot-h:  40px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%; height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* ── Top bar ── */
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: var(--bar-h);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+#set-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+}
+
+.top-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1;
+}
+.top-btn:disabled { opacity: .25; cursor: default; }
+.top-btn:not(:disabled):active { background: var(--surface); }
+
+/* ── Court ── */
+#court {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  height: calc(100dvh - var(--bar-h) - var(--foot-h));
+}
+
+@media (orientation: portrait) and (max-width: 600px) {
+  #court { flex-direction: column; }
+  #divider { width: 100% !important; height: 1px !important; }
+  .minus-btn { top: 12px; bottom: auto !important; }
+  #panel-a .minus-btn { left: auto !important; right: 12px; }
+}
+
+/* ── Panels ── */
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  cursor: pointer;
+  position: relative;
+  transition: background .08s;
+}
+.panel:active { background: rgba(255,255,255,.035); }
+.panel.match-done { cursor: default; opacity: .6; }
+
+.divider {
+  width: 1px;
+  background: var(--border);
+  align-self: stretch;
+}
+
+/* ── Team header ── */
+.team-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.serve-dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity .15s;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.serve-dot.active { opacity: 1; }
+
+.team-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: text;
+  white-space: nowrap;
+}
+
+.name-input {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  width: 120px;
+  max-width: 100%;
+}
+
+.sets-badge {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--accent);
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ── Score ── */
+.score {
+  font-size: clamp(80px, 28vmin, 220px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.02em;
+  color: var(--text);
+  pointer-events: none;
+}
+
+/* leading zero: dim the tens digit if score < 10 */
+.score.single::before {
+  content: '0';
+  opacity: .15;
+}
+
+/* ── Minus button ── */
+.minus-btn {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 14px;
+  cursor: pointer;
+}
+#panel-a .minus-btn { right: auto; left: 14px; }
+.minus-btn:active { background: var(--surface); color: var(--text); }
+
+/* ── Footer ── */
+#footbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: var(--foot-h);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#set-history {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted);
+  overflow: hidden;
+}
+
+.set-hist-item {
+  white-space: nowrap;
+}
+.set-hist-item.won-a { color: var(--text); }
+.set-hist-item.won-b { color: var(--text); }
+.set-hist-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #333;
+}
+
+#target-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #333;
+  white-space: nowrap;
+}
+
+/* ── Overlays ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+.overlay.hidden { display: none; }
+
+.overlay-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 48px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 90vw;
+}
+
+.overlay-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.overlay-headline {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.overlay-score {
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: -.01em;
+  color: var(--text);
+  line-height: 1;
+}
+
+.overlay-btn {
+  margin-top: 8px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 28px;
+  cursor: pointer;
+}
+.overlay-btn:active { opacity: .85; }

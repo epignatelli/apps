@@ -1,0 +1,11 @@
+{
+  "name": "VB Scoreboard",
+  "short_name": "Scoreboard",
+  "description": "Keep score for a volleyball match — sets, serve tracking, and match history.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "orientation": "any",
+  "icons": []
+}

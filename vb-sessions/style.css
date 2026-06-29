@@ -840,6 +840,7 @@ body {
 .user-flag.provider-badge { color: #2dd4bf;      background: rgba(20,184,166,.15);    border-color: rgba(45,212,191,.35); }
 .user-flag.coach-req      { color: var(--green); background: var(--green-bg);         border-color: rgba(34,201,122,.35); }
 .user-flag.provider-req   { color: #2dd4bf;      background: rgba(20,184,166,.15);    border-color: rgba(45,212,191,.35); }
+.user-flag.ref-req        { color: #38bdf8;      background: rgba(56,189,248,.12);    border-color: rgba(56,189,248,.35); }
 .user-flag.admin-req      { color: #f472b6;      background: rgba(244,114,182,.13);   border-color: rgba(244,114,182,.35); }
 
 .user-actions { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
@@ -857,6 +858,7 @@ body {
 .role-pill.active.admin    { background: rgba(244,114,182,.13);   border-color: rgba(244,114,182,.5);  color: #f472b6; }
 .role-pill.active.coach    { background: var(--green-bg);         border-color: rgba(34,201,122,.35);  color: var(--green); }
 .role-pill.active.provider { background: rgba(20,184,166,.15);    border-color: rgba(45,212,191,.5);   color: #2dd4bf; }
+.role-pill.active.referee  { background: rgba(56,189,248,.12);    border-color: rgba(56,189,248,.5);   color: #38bdf8; }
 
 .role-toggle {
   font-family: var(--sport); font-size: 10px; font-weight: 700;

@@ -2629,8 +2629,10 @@ function _renderUserRow(u) {
   const hasAdmin           = roles.includes('admin');
   const hasCoach           = roles.includes('coach');
   const hasProvider        = roles.includes('provider');
+  const hasReferee         = roles.includes('referee');
   const hasPendingCoach    = _isOpenRequest(u.coachRequest) && !hasCoach;
   const hasPendingProvider = _isOpenRequest(u.providerRequest) && !hasProvider;
+  const hasPendingReferee  = _isOpenRequest(u.refereeRequest) && !hasReferee;
   const hasPendingAdmin    = !!u.adminRequest && !hasAdmin;
   const initials           = (u.name || u.email || '?')[0].toUpperCase();
   const incomplete         = !u.gender || !(u.positions||[]).length;
@@ -2648,6 +2650,7 @@ function _renderUserRow(u) {
       ${pill('Admin', 'admin',    hasAdmin)}
       ${pill('Coach', 'coach',    hasCoach)}
       ${pill('Host',  'provider', hasProvider)}
+      ${pill('Ref',   'referee',  hasReferee)}
     </div>`;
 
   return `
@@ -2661,6 +2664,7 @@ function _renderUserRow(u) {
           ${incomplete         ? '<span class="user-flag">incomplete</span>'              : ''}
           ${hasPendingCoach    ? '<span class="user-flag coach-req">coach req</span>'    : ''}
           ${hasPendingProvider ? '<span class="user-flag provider-req">host req</span>'  : ''}
+          ${hasPendingReferee  ? '<span class="user-flag ref-req">ref req</span>'        : ''}
           ${hasPendingAdmin    ? '<span class="user-flag admin-req">admin req</span>'    : ''}
         </div>
         <div class="user-meta">${esc(u.email || '')}${genderSym ? ` · ${genderSym}` : ''}${posStr ? ` · ${posStr}` : ''}${joined ? ` · joined ${joined}` : ''}</div>
