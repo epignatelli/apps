@@ -106,6 +106,12 @@ function nextSet() {
   if (_matchOver()) _showMatchWon();
 }
 
+function toggleBestOf() {
+  _state.bestOf = _state.bestOf === 5 ? 3 : 5;
+  _save();
+  render();
+}
+
 function confirmNewMatch() {
   const hasProgress = _state.pointsA > 0 || _state.pointsB > 0 || _state.sets.length > 0;
   if (hasProgress && !confirm('Start a new match? Current score will be lost.')) return;
@@ -197,19 +203,23 @@ function render() {
   if (nameElA) nameElA.textContent = nameA;
   if (nameElB) nameElB.textContent = nameB;
 
-  // Set wins
-  document.getElementById('sets-a').textContent = sA;
-  document.getElementById('sets-b').textContent = sB;
+  // Set win dots
+  const toWin = _toWin();
+  const _dots = won => Array.from({length: toWin}, (_, i) =>
+    `<span class="set-dot${i < won ? ' filled' : ''}"></span>`
+  ).join('');
+  document.getElementById('sets-a').innerHTML = _dots(sA);
+  document.getElementById('sets-b').innerHTML = _dots(sB);
 
   // Serve dots
   document.getElementById('serve-a').classList.toggle('active', serving === 'a');
   document.getElementById('serve-b').classList.toggle('active', serving === 'b');
 
   // Topbar set label
-  const setLabel = setNum <= bestOf
-    ? `Set ${setNum} · Bo${bestOf}`
-    : `Bo${bestOf}`;
-  document.getElementById('set-label').textContent = setLabel;
+  document.getElementById('set-label').textContent = `Set ${Math.min(setNum, bestOf)} of ${bestOf}`;
+
+  // Bo toggle button label
+  document.getElementById('bestof-btn').textContent = `Bo${bestOf}`;
 
   // Footer — set history
   const hist = document.getElementById('set-history');

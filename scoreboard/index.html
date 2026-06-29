@@ -16,7 +16,10 @@
   <header id="topbar">
     <button id="undo-btn" class="top-btn" onclick="undo()" disabled>↩</button>
     <div id="set-label">Set 1</div>
-    <button class="top-btn" onclick="confirmNewMatch()">New match</button>
+    <div class="top-right">
+      <button id="bestof-btn" class="top-btn" onclick="toggleBestOf()">Bo5</button>
+      <button class="top-btn" onclick="confirmNewMatch()">New</button>
+    </div>
   </header>
 
   <main id="court">
@@ -24,7 +27,7 @@
       <div class="team-header">
         <span class="serve-dot" id="serve-a" onclick="setServe(event,'a')" title="Serving"></span>
         <span class="team-name" id="name-a" onclick="editName(event,'a')">Team A</span>
-        <span class="sets-badge" id="sets-a">0</span>
+        <div class="sets-dots" id="sets-a"></div>
       </div>
       <div class="score" id="score-a">0</div>
       <button class="minus-btn" id="minus-a" onclick="unscore(event,'a')">−</button>
@@ -36,7 +39,7 @@
       <div class="team-header">
         <span class="serve-dot" id="serve-b" onclick="setServe(event,'b')" title="Serving"></span>
         <span class="team-name" id="name-b" onclick="editName(event,'b')">Team B</span>
-        <span class="sets-badge" id="sets-b">0</span>
+        <div class="sets-dots" id="sets-b"></div>
       </div>
       <div class="score" id="score-b">0</div>
       <button class="minus-btn" id="minus-b" onclick="unscore(event,'b')">−</button>
