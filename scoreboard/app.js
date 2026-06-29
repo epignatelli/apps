@@ -5,13 +5,14 @@ const STORE = 'vb-scoreboard-v1';
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let _state = {
-  nameA:   'Team A',
-  nameB:   'Team B',
-  bestOf:  5,          // 3 or 5
-  pointsA: 0,
-  pointsB: 0,
-  serving: 'a',
-  sets:    [],         // [{a, b}] completed sets, in order
+  nameA:      'Team A',
+  nameB:      'Team B',
+  bestOf:     5,          // 3 or 5
+  setPoints:  25,         // 15 | 21 | 25
+  pointsA:    0,
+  pointsB:    0,
+  serving:    'a',
+  sets:       [],         // [{a, b}] completed sets, in order
 };
 
 let _history = [];     // undo stack: array of _state snapshots
@@ -34,8 +35,10 @@ function _copy(s) { return JSON.parse(JSON.stringify(s)); }
 // ── Volleyball rules ──────────────────────────────────────────────────────────
 
 function _setTarget() {
-  // 5th set (index 4) plays to 15; all others to 25
-  return _state.sets.length >= 4 ? 15 : 25;
+  const { setPoints, sets, bestOf } = _state;
+  // Standard rule: deciding set (last possible set) plays to 15 when setPoints is 25
+  const isDeciding = sets.length >= bestOf - 1;
+  return (setPoints === 25 && isDeciding) ? 15 : setPoints;
 }
 
 function _isSetWon() {
@@ -108,6 +111,14 @@ function nextSet() {
 
 function toggleBestOf() {
   _state.bestOf = _state.bestOf === 5 ? 3 : 5;
+  _save();
+  render();
+}
+
+function cycleSetPoints() {
+  const seq = [25, 21, 15];
+  const i = seq.indexOf(_state.setPoints);
+  _state.setPoints = seq[(i + 1) % seq.length];
   _save();
   render();
 }
@@ -220,6 +231,9 @@ function render() {
 
   // Bo toggle button label
   document.getElementById('bestof-btn').textContent = `Bo${bestOf}`;
+
+  // Set points button label
+  document.getElementById('setpoints-btn').textContent = `${_state.setPoints}pts`;
 
   // Footer — set history
   const hist = document.getElementById('set-history');
