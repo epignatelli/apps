@@ -14,6 +14,9 @@
 #panel-a { --team-color: var(--color-a); --team-bg: var(--color-a); --team-fg: #111111; }
 #panel-b { --team-color: var(--color-b); --team-bg: var(--color-b); --team-fg: #f5f5f0; }
 
+#court.mono #panel-a,
+#court.mono #panel-b { --team-bg: var(--bg); --team-fg: var(--text); }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {

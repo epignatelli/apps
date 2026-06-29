@@ -8,7 +8,8 @@ let _state = {
   nameA:      'Team A',
   nameB:      'Team B',
   bestOf:     5,          // 3 or 5
-  setPoints:  25,         // 15 | 21 | 25
+  setPoints:  25,         // 15 | 18 | 21 | 25
+  coloured:   true,       // true = team colours | false = mono dark
   pointsA:    0,
   pointsB:    0,
   serving:    'a',
@@ -111,6 +112,12 @@ function nextSet() {
 
 function toggleBestOf() {
   _state.bestOf = _state.bestOf === 5 ? 3 : 5;
+  _save();
+  render();
+}
+
+function toggleColour() {
+  _state.coloured = !_state.coloured;
   _save();
   render();
 }
@@ -258,6 +265,10 @@ function render() {
 
   // Set points button label
   document.getElementById('setpoints-btn').textContent = `${_state.setPoints}pts`;
+
+  // Colour mode
+  document.getElementById('court').classList.toggle('mono', !_state.coloured);
+  document.getElementById('colour-btn').textContent = _state.coloured ? 'Mono' : 'Colour';
 
   // Footer — set history
   const hist = document.getElementById('set-history');
