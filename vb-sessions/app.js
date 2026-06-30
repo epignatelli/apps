@@ -5445,8 +5445,9 @@ function openFinancesScreen() {
   if (!_isAdmin) return;
   _setHash('finances');
   showScreen('finances');
-  _setNav('primary', 'admin');
-  _setTitle('Sessions');
+  _setNav('sub', null);
+  _setTitle('Finances');
+  _setBack(() => history.back());
   renderFinances();
 }
 
@@ -5673,8 +5674,9 @@ function openInsightsScreen() {
   if (!_isAdmin) return;
   _setHash('insights');
   showScreen('insights');
-  _setNav('primary', 'admin');
-  _setTitle('Sessions');
+  _setNav('sub', null);
+  _setTitle('Insights');
+  _setBack(() => history.back());
   renderInsights();
 }
 
