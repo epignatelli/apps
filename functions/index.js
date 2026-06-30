@@ -71,7 +71,7 @@ async function _syncPublicProfile(db, uid, data) {
     coachRate:         data.coachRate          != null ? data.coachRate : null,
     coach1to1Enabled:  data.coach1to1Enabled   || false,
     refBio:            data.refBio             || null,
-    refCertification:  data.refCertification   || null,
+    refCertifications: data.refCertifications   || (data.refCertification ? [data.refCertification] : []),
     refLevels:         data.refLevels          || [],
     refTypes:          data.refTypes           || [],
     refAvailability:   data.refAvailability    || [],

@@ -3281,7 +3281,7 @@ async function openProfileScreen(uid) {
     const _availPeriodLabelRef = { am: 'morning', pm: 'afternoon', eve: 'evening' };
     const _lvlLabelRef = { beginner: 'Beginner', improver: 'Intermediate', intermediate: 'Advanced', advanced: 'Competitive', competitive: 'Elite' };
     const refProfileSection = hasReferee ? (() => {
-      const cert      = u.refCertification;
+      const cert      = (u.refCertifications || (u.refCertification ? [u.refCertification] : []));
       const bio       = u.refBio;
       const lvlMeta   = (u.refLevels    || []).map(l => _lvlLabelRef[l] || l).join(', ');
       const typeMeta  = (u.refTypes     || []).map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ');
@@ -3296,7 +3296,7 @@ async function openProfileScreen(uid) {
       return `
         <details class="detail-section ref-section" open>
           <summary class="detail-section-title collapsible-title">Referee</summary>
-          ${cert ? `<div class="ref-cert-badge">${esc(cert)}</div>` : ''}
+          ${cert.length ? `<div class="ref-cert-badges">${cert.map(c => `<span class="ref-cert-badge">${esc(c)}</span>`).join('')}</div>` : ''}
           ${bio ? `<div class="detail-description" style="margin-bottom:10px">${esc(bio)}</div>` : ''}
           <div class="detail-meta-grid">
             ${lvlMeta   ? `<div class="detail-meta-row"><span class="detail-meta-label">Levels</span><span>${esc(lvlMeta)}</span></div>` : ''}
@@ -5155,7 +5155,8 @@ async function openEditProfile() {
       const isRef = (data.roles || []).includes('referee');
       refSection.style.display = isRef ? '' : 'none';
       if (isRef) {
-        document.getElementById('pf-ref-cert').value  = data.refCertification || '';
+        const certs = data.refCertifications || (data.refCertification ? [data.refCertification] : []);
+        document.querySelectorAll('.pf-ref-cert').forEach(cb => { cb.checked = certs.includes(cb.value); });
         document.getElementById('pf-ref-bio').value   = data.refBio || '';
         document.getElementById('pf-ref-rate').value  = data.refRate != null ? data.refRate : '';
         const refLvlSet  = new Set(data.refLevels  || []);
@@ -5210,7 +5211,7 @@ async function saveProfile() {
   const refSection = document.getElementById('ref-profile-section');
   const refVisible = refSection && refSection.style.display !== 'none';
   const refData = refVisible ? {
-    refCertification: document.getElementById('pf-ref-cert').value.trim() || null,
+    refCertifications: [...document.querySelectorAll('.pf-ref-cert:checked')].map(cb => cb.value),
     refBio:           document.getElementById('pf-ref-bio').value.trim() || null,
     refLevels:        Array.from(document.querySelectorAll('.pf-ref-lvl:checked')).map(el => el.value),
     refTypes:         Array.from(document.querySelectorAll('.pf-ref-type:checked')).map(el => el.value),
@@ -6303,7 +6304,7 @@ function _renderRefOnboarding() {
   const u = _currentUserDoc || {};
   const items = [
     { label: 'Add your bio',            done: !!(u.refBio && u.refBio.trim()) },
-    { label: 'Add your certification',  done: !!(u.refCertification && u.refCertification.trim()) },
+    { label: 'Add your certification',  done: !!(u.refCertifications?.length || u.refCertification) },
     { label: 'Set levels you referee',  done: !!(u.refLevels && u.refLevels.length) },
     { label: 'Set session types',       done: !!(u.refTypes && u.refTypes.length) },
     { label: 'Set your availability',   done: !!(u.refAvailability && u.refAvailability.length) },
@@ -6443,8 +6444,8 @@ function _applyRefFilters() {
     const avatar   = u.photoURL
       ? `<img class="user-avatar" src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer" />`
       : `<div class="user-avatar user-avatar--initials">${esc(initials)}</div>`;
-    const certBadge = u.refCertification
-      ? `<span class="ref-cert-badge">${esc(u.refCertification)}</span>` : '';
+    const certs = u.refCertifications || (u.refCertification ? [u.refCertification] : []);
+    const certBadge = certs.map(c => `<span class="ref-cert-badge">${esc(c)}</span>`).join('');
     const lvlChips = (u.refLevels || [])
       .map(l => `<span class="session-badge level-${esc(l)}">${esc(_lvlLabelRef[l] || l)}</span>`)
       .join('');
