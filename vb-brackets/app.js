@@ -433,13 +433,16 @@ function _matchCard(m, canEdit) {
   const clickable = canEdit && !m.winner;
   const scoreStr = m.scoreA !== null && m.scoreB !== null
     ? `${m.scoreA} — ${m.scoreB}`
-    : '— vs —';
+    : 'vs';
   return `
     <div class="match-card${wA ? ' mc-winner-a' : wB ? ' mc-winner-b' : ''}"
       ${clickable ? `onclick="_openScore('${_esc(m.id)}')"` : ''}>
-      <span class="mc-name mc-name-a">${_esc(m.nameA)}</span>
+      <span class="mc-teams">
+        <span class="mc-name mc-name-a">${_esc(m.nameA)}</span>
+        <span class="mc-sep">·</span>
+        <span class="mc-name mc-name-b">${_esc(m.nameB)}</span>
+      </span>
       <span class="mc-score">${scoreStr}</span>
-      <span class="mc-name mc-name-b">${_esc(m.nameB)}</span>
     </div>`;
 }
 
