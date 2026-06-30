@@ -556,7 +556,7 @@ async function _routeFromHash() {
 }
 
 const _LEVEL_LABELS  = { '': 'Level', any: 'Any level', beginner: 'Beginner', improver: 'Intermediate', intermediate: 'Advanced', advanced: 'Competit.', competitive: 'Elite' };
-const _GENDER_LABELS = { '': 'Gender', mixed: 'Mixed', women: 'Women', men: 'Men' };
+const _GENDER_LABELS = { '': 'Net height', mixed: 'Mixed', women: 'Women', men: 'Men' };
 
 function _updateFbarBtn(type, isActive, label) {
   const btn  = document.getElementById('fbtn-' + type);
@@ -622,7 +622,7 @@ function _syncFilterPillsToState() {
     b.classList.toggle('active', v === '' ? !_activeGenderFilter.size : _activeGenderFilter.has(v));
   });
   _updateFbarBtn('level',  _activeLevelFilter.size,  _setLabel(_activeLevelFilter,  'Level',  _LEVEL_LABELS));
-  _updateFbarBtn('gender', _activeGenderFilter.size, _setLabel(_activeGenderFilter, 'Gender', _GENDER_LABELS));
+  _updateFbarBtn('gender', _activeGenderFilter.size, _setLabel(_activeGenderFilter, 'Net height', _GENDER_LABELS));
   _updateFbarBtn('host',   _activeProviderFilter, _activeProviderFilter ? 'Host ✓' : 'Host');
   _updateFbarBtn('type',   _activeTypeFilter.size,   _setLabel(_activeTypeFilter, 'Type', _TYPE_LABELS));
   _updateFbarBtn('status', _activeStatusFilter !== '', _STATUS_LABELS[_activeStatusFilter] || 'Status');
@@ -681,7 +681,7 @@ function setGenderFilter(gender) {
     const v = b.dataset.gender || '';
     b.classList.toggle('active', v === '' ? !_activeGenderFilter.size : _activeGenderFilter.has(v));
   });
-  _updateFbarBtn('gender', _activeGenderFilter.size, _setLabel(_activeGenderFilter, 'Gender', _GENDER_LABELS));
+  _updateFbarBtn('gender', _activeGenderFilter.size, _setLabel(_activeGenderFilter, 'Net height', _GENDER_LABELS));
   renderHome();
 }
 
