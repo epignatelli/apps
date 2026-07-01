@@ -146,7 +146,7 @@ function _showCreate() {
         </select>
       </div>
       <div class="field">
-        <label class="field-label">Sets per match</label>
+        <label class="field-label">Sets per match (group stage)</label>
         <select class="field-input field-select" id="cf-sets">
           <option value="1" selected>1 set</option>
           <option value="3">Best of 3 (first to 2)</option>
@@ -154,6 +154,14 @@ function _showCreate() {
         </select>
       </div>
       <div class="section-divider">Knockout</div>
+      <div class="field">
+        <label class="field-label">Sets per match (knockout)</label>
+        <select class="field-input field-select" id="cf-ko-sets">
+          <option value="1">1 set</option>
+          <option value="3" selected>Best of 3 (first to 2)</option>
+          <option value="5">Best of 5 (first to 3)</option>
+        </select>
+      </div>
       <div class="field">
         <label class="field-label">Teams per group → Winners bracket</label>
         <select class="field-input field-select" id="cf-advw" onchange="_updateCreateForm()">
@@ -254,6 +262,7 @@ async function _submitCreate(e) {
     const groups = parseInt(document.getElementById('cf-groups').value);
     const rounds = parseInt(document.getElementById('cf-rounds').value);
     const sets   = parseInt(document.getElementById('cf-sets').value);
+    const koSets = parseInt(document.getElementById('cf-ko-sets').value);
     const advW   = parseInt(document.getElementById('cf-advw').value);
     const advL   = parseInt(document.getElementById('cf-advl').value);
     const wbf    = document.getElementById('cf-wbf').value;
@@ -271,6 +280,7 @@ async function _submitCreate(e) {
       teamsPerGroup: Math.ceil(names.length / groups),
       roundsPerGroup: rounds,
       setsPerMatch: sets,
+      knockoutSetsPerMatch: koSets,
       advanceWinners: advW,
       advanceLosers: advL,
       winnersBracket: wbf,
@@ -294,6 +304,7 @@ async function _submitEdit(e) {
     const groups = parseInt(document.getElementById('cf-groups').value);
     const rounds = parseInt(document.getElementById('cf-rounds').value);
     const sets   = parseInt(document.getElementById('cf-sets').value);
+    const koSets = parseInt(document.getElementById('cf-ko-sets').value);
     const advW   = parseInt(document.getElementById('cf-advw').value);
     const advL   = parseInt(document.getElementById('cf-advl').value);
     const wbf    = document.getElementById('cf-wbf').value;
@@ -306,14 +317,14 @@ async function _submitEdit(e) {
     await _tRef(_tid).update({
       name: newName, groupCount: groups,
       teamsPerGroup: Math.ceil(names.length / groups),
-      roundsPerGroup: rounds, setsPerMatch: sets,
+      roundsPerGroup: rounds, setsPerMatch: sets, knockoutSetsPerMatch: koSets,
       advanceWinners: advW, advanceLosers: advL, winnersBracket: wbf, teams,
     });
 
     // Update local state so _startGroups reads the new values
     Object.assign(_tournament, { name: newName, groupCount: groups,
       teamsPerGroup: Math.ceil(names.length / groups),
-      roundsPerGroup: rounds, setsPerMatch: sets,
+      roundsPerGroup: rounds, setsPerMatch: sets, knockoutSetsPerMatch: koSets,
       advanceWinners: advW, advanceLosers: advL, winnersBracket: wbf, teams,
     });
 
@@ -376,7 +387,8 @@ function _renderSetup() {
       <div class="setup-row"><span>Groups</span><span>${t.groupCount}</span></div>
       <div class="setup-row"><span>Teams per group</span><span>${t.teamsPerGroup}</span></div>
       <div class="setup-row"><span>Format</span><span>${t.roundsPerGroup === 2 ? 'Double round-robin' : 'Single round-robin'}</span></div>
-      <div class="setup-row"><span>Sets per match</span><span>${t.setsPerMatch === 3 ? 'Best of 3' : t.setsPerMatch === 5 ? 'Best of 5' : '1 set'}</span></div>
+      <div class="setup-row"><span>Sets per match (groups)</span><span>${t.setsPerMatch === 3 ? 'Best of 3' : t.setsPerMatch === 5 ? 'Best of 5' : '1 set'}</span></div>
+      <div class="setup-row"><span>Sets per match (knockout)</span><span>${(t.knockoutSetsPerMatch||t.setsPerMatch) === 3 ? 'Best of 3' : (t.knockoutSetsPerMatch||t.setsPerMatch) === 5 ? 'Best of 5' : '1 set'}</span></div>
       <div class="setup-row"><span>Advance → winners</span><span>${t.advanceWinners} per group</span></div>
       <div class="setup-row"><span>Advance → losers</span><span>${t.advanceLosers > 0 ? `${t.advanceLosers} per group` : 'None'}</span></div>
       <div class="setup-row"><span>Winners bracket</span><span>${t.winnersBracket === 'double' ? 'Double elimination' : 'Single elimination'}</span></div>
@@ -422,7 +434,7 @@ function _renderSetup() {
         </select>
       </div>
       <div class="field">
-        <label class="field-label">Sets per match</label>
+        <label class="field-label">Sets per match (group stage)</label>
         <select class="field-input field-select" id="cf-sets">
           <option value="1"${S(t.setsPerMatch,1)}>1 set</option>
           <option value="3"${S(t.setsPerMatch,3)}>Best of 3 (first to 2)</option>
@@ -430,6 +442,14 @@ function _renderSetup() {
         </select>
       </div>
       <div class="section-divider">Knockout</div>
+      <div class="field">
+        <label class="field-label">Sets per match (knockout)</label>
+        <select class="field-input field-select" id="cf-ko-sets">
+          <option value="1"${S(t.knockoutSetsPerMatch||t.setsPerMatch,1)}>1 set</option>
+          <option value="3"${S(t.knockoutSetsPerMatch||t.setsPerMatch,3)}>Best of 3 (first to 2)</option>
+          <option value="5"${S(t.knockoutSetsPerMatch||t.setsPerMatch,5)}>Best of 5 (first to 3)</option>
+        </select>
+      </div>
       <div class="field">
         <label class="field-label">Teams per group → Winners bracket</label>
         <select class="field-input field-select" id="cf-advw" onchange="_updateCreateForm()">
@@ -576,6 +596,13 @@ function _renderGroups() {
   _sc().innerHTML = html;
 }
 
+function _spm(m) {
+  const t = _tournament;
+  return m.phase === 'group'
+    ? (t.setsPerMatch || 1)
+    : (t.knockoutSetsPerMatch || t.setsPerMatch || 1);
+}
+
 function _matchesHeader(t) {
   const spm = t.setsPerMatch || 1;
   if (spm === 1) return `<div class="matches-sh">Matches</div>`;
@@ -586,7 +613,7 @@ function _matchesHeader(t) {
 function _matchCard(m, canEdit) {
   const wA = m.winner === 'A', wB = m.winner === 'B';
   const clickable = canEdit;
-  const spm = _tournament.setsPerMatch || 1;
+  const spm = _spm(m);
   const sets = m.sets || [];
 
   const refHtml = m.refTeamName ? `<div class="mc-ref">ref · ${_esc(m.refTeamName)}</div>` : '';
@@ -631,7 +658,7 @@ function _openScore(matchId) {
   if (!m) return;
   document.getElementById('score-overlay')?.remove();
 
-  const spm = _tournament.setsPerMatch || 1;
+  const spm = _spm(m);
   const el = document.createElement('div');
   el.className = 'score-overlay'; el.id = 'score-overlay';
 
@@ -689,7 +716,7 @@ async function _submitScore(matchId) {
   const m = _matches.find(x => x.id === matchId);
   if (!m) return;
 
-  const spm = _tournament.setsPerMatch || 1;
+  const spm = _spm(m);
   let scoreA, scoreB, winner, update;
 
   if (spm === 1) {
