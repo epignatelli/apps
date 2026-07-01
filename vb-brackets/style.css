@@ -274,7 +274,7 @@ body {
 .match-card[onclick] { cursor: pointer; }
 .match-card[onclick]:active { background: rgba(255,255,255,.03); }
 
-.mc-teams { flex: 1; display: flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
+.mc-teams { flex: 0 1 auto; display: flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
 .mc-name { font-size: 15px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mc-sep { color: var(--mid); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; flex-shrink: 0; }
 
