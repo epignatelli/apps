@@ -466,9 +466,7 @@ function _matchCard(m, canEdit) {
   const hasScore = m.scoreA !== null && m.scoreB !== null;
   const scoreHtml = hasScore
     ? `<span class="mc-s${wA ? ' mc-s-win' : ''}">${m.scoreA}</span><span class="mc-score-sep">—</span><span class="mc-s${wB ? ' mc-s-win' : ''}">${m.scoreB}</span>`
-    : clickable
-      ? `<span class="mc-add-score">＋</span>`
-      : `<span class="mc-score-vs">vs</span>`;
+    : `<span class="mc-score-vs${clickable ? ' mc-score-vs-edit' : ''}">vs</span>`;
   const refHtml = m.refTeamName
     ? `<div class="mc-ref">ref · ${_esc(m.refTeamName)}</div>` : '';
   return `
