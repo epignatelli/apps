@@ -430,7 +430,7 @@ function _renderGroups() {
 
 function _matchCard(m, canEdit) {
   const wA = m.winner === 'A', wB = m.winner === 'B';
-  const clickable = canEdit && !m.winner;
+  const clickable = canEdit;
   const scoreStr = m.scoreA !== null && m.scoreB !== null
     ? `${m.scoreA} — ${m.scoreB}`
     : 'vs';
@@ -598,7 +598,7 @@ function _renderBracket(matches, canEdit) {
     for (const m of rMatches) {
       const wA = m.winner === 'A', wB = m.winner === 'B';
       const isBye = m.nameA === 'BYE' || m.nameB === 'BYE';
-      const clickable = canEdit && !m.winner && !isBye && m.teamAId && m.teamBId;
+      const clickable = canEdit && !isBye && m.teamAId && m.teamBId;
       bodyHtml += `
         <div class="bracket-match${m.winner ? ' bm-done' : ''}"
           ${clickable ? `onclick="_openScore('${_esc(m.id)}')"` : ''}>
