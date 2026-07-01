@@ -145,6 +145,14 @@ function _showCreate() {
           <option value="2">Double (each pair plays twice)</option>
         </select>
       </div>
+      <div class="field">
+        <label class="field-label">Sets per match</label>
+        <select class="field-input field-select" id="cf-sets">
+          <option value="1" selected>1 set</option>
+          <option value="3">Best of 3 (first to 2)</option>
+          <option value="5">Best of 5 (first to 3)</option>
+        </select>
+      </div>
       <div class="section-divider">Knockout</div>
       <div class="field">
         <label class="field-label">Teams per group → Winners bracket</label>
@@ -245,6 +253,7 @@ async function _submitCreate(e) {
   try {
     const groups = parseInt(document.getElementById('cf-groups').value);
     const rounds = parseInt(document.getElementById('cf-rounds').value);
+    const sets   = parseInt(document.getElementById('cf-sets').value);
     const advW   = parseInt(document.getElementById('cf-advw').value);
     const advL   = parseInt(document.getElementById('cf-advl').value);
     const wbf    = document.getElementById('cf-wbf').value;
@@ -261,6 +270,7 @@ async function _submitCreate(e) {
       groupCount: groups,
       teamsPerGroup: Math.ceil(names.length / groups),
       roundsPerGroup: rounds,
+      setsPerMatch: sets,
       advanceWinners: advW,
       advanceLosers: advL,
       winnersBracket: wbf,
@@ -330,6 +340,7 @@ function _renderSetup() {
         <div class="setup-row"><span>Groups</span><span>${t.groupCount}</span></div>
         <div class="setup-row"><span>Teams per group</span><span>${t.teamsPerGroup}</span></div>
         <div class="setup-row"><span>Format</span><span>${t.roundsPerGroup === 2 ? 'Double round-robin' : 'Single round-robin'}</span></div>
+        <div class="setup-row"><span>Sets per match</span><span>${t.setsPerMatch === 3 ? 'Best of 3' : t.setsPerMatch === 5 ? 'Best of 5' : '1 set'}</span></div>
         <div class="setup-row"><span>Advance → winners</span><span>${t.advanceWinners} per group</span></div>
         <div class="setup-row"><span>Advance → losers</span><span>${t.advanceLosers > 0 ? `${t.advanceLosers} per group` : 'None'}</span></div>
         <div class="setup-row"><span>Winners bracket</span><span>${t.winnersBracket === 'double' ? 'Double elimination' : 'Single elimination'}</span></div>
@@ -458,45 +469,101 @@ function _openScore(matchId) {
   if (!m) return;
   document.getElementById('score-overlay')?.remove();
 
+  const spm = _tournament.setsPerMatch || 1;
   const el = document.createElement('div');
   el.className = 'score-overlay'; el.id = 'score-overlay';
-  el.innerHTML = `
-    <div class="score-modal">
-      <div class="score-modal-title">Enter score</div>
-      <div class="score-row">
-        <span class="score-team-name">${_esc(m.nameA)}</span>
-        <input class="score-input" id="se-a" type="number" min="0" max="99" inputmode="numeric"
-          value="${m.scoreA !== null ? m.scoreA : ''}"/>
-      </div>
-      <div class="score-row">
-        <span class="score-team-name">${_esc(m.nameB)}</span>
-        <input class="score-input" id="se-b" type="number" min="0" max="99" inputmode="numeric"
-          value="${m.scoreB !== null ? m.scoreB : ''}"/>
-      </div>
-      <div class="score-modal-actions">
-        <button class="btn-ghost" onclick="document.getElementById('score-overlay').remove()">Cancel</button>
-        <button class="btn-primary" onclick="_submitScore('${_esc(matchId)}')">Save</button>
-      </div>
-    </div>`;
-  document.body.appendChild(el);
-  document.getElementById('se-a').focus();
+
+  if (spm === 1) {
+    el.innerHTML = `
+      <div class="score-modal">
+        <div class="score-modal-title">Enter score</div>
+        <div class="score-row">
+          <span class="score-team-name">${_esc(m.nameA)}</span>
+          <input class="score-input" id="se-a" type="number" min="0" max="99" inputmode="numeric"
+            value="${m.scoreA !== null ? m.scoreA : ''}"/>
+        </div>
+        <div class="score-row">
+          <span class="score-team-name">${_esc(m.nameB)}</span>
+          <input class="score-input" id="se-b" type="number" min="0" max="99" inputmode="numeric"
+            value="${m.scoreB !== null ? m.scoreB : ''}"/>
+        </div>
+        <div class="score-modal-actions">
+          <button class="btn-ghost" onclick="document.getElementById('score-overlay').remove()">Cancel</button>
+          <button class="btn-primary" onclick="_submitScore('${_esc(matchId)}')">Save</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    document.getElementById('se-a').focus();
+  } else {
+    const prevSets = m.sets || [];
+    const setRows = Array.from({ length: spm }, (_, i) => `
+      <div class="score-set-row">
+        <span class="sset-label">Set ${i + 1}</span>
+        <input class="score-input sset-input" id="se-${i}-a" type="number" min="0" max="99" inputmode="numeric"
+          value="${prevSets[i] ? prevSets[i].a : ''}"/>
+        <input class="score-input sset-input" id="se-${i}-b" type="number" min="0" max="99" inputmode="numeric"
+          value="${prevSets[i] ? prevSets[i].b : ''}"/>
+      </div>`).join('');
+    el.innerHTML = `
+      <div class="score-modal score-modal-sets">
+        <div class="score-modal-title">Enter score</div>
+        <div class="score-sets-header">
+          <span></span>
+          <span class="sset-team">${_esc(m.nameA)}</span>
+          <span class="sset-team">${_esc(m.nameB)}</span>
+        </div>
+        ${setRows}
+        <div class="score-modal-actions">
+          <button class="btn-ghost" onclick="document.getElementById('score-overlay').remove()">Cancel</button>
+          <button class="btn-primary" onclick="_submitScore('${_esc(matchId)}')">Save</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    document.getElementById('se-0-a').focus();
+  }
 }
 
 async function _submitScore(matchId) {
   const m = _matches.find(x => x.id === matchId);
   if (!m) return;
 
-  const sA = parseInt(document.getElementById('se-a').value);
-  const sB = parseInt(document.getElementById('se-b').value);
+  const spm = _tournament.setsPerMatch || 1;
+  let scoreA, scoreB, winner, update;
 
-  if (isNaN(sA) || isNaN(sB) || sA < 0 || sB < 0) { _toast('Enter valid scores'); return; }
-  if (sA === sB) { _toast('Scores cannot be equal'); return; }
+  if (spm === 1) {
+    const sA = parseInt(document.getElementById('se-a').value);
+    const sB = parseInt(document.getElementById('se-b').value);
+    if (isNaN(sA) || isNaN(sB) || sA < 0 || sB < 0) { _toast('Enter valid scores'); return; }
+    if (sA === sB) { _toast('Scores cannot be equal'); return; }
+    scoreA = sA; scoreB = sB;
+    winner = sA > sB ? 'A' : 'B';
+    update = { scoreA, scoreB, winner };
+  } else {
+    const setsToWin = Math.ceil(spm / 2);
+    const sets = [];
+    let wA = 0, wB = 0;
+    for (let i = 0; i < spm; i++) {
+      const aVal = document.getElementById(`se-${i}-a`)?.value;
+      const bVal = document.getElementById(`se-${i}-b`)?.value;
+      if (aVal === '' && bVal === '') continue;
+      const a = parseInt(aVal), b = parseInt(bVal);
+      if (isNaN(a) || isNaN(b) || a < 0 || b < 0) { _toast(`Set ${i + 1}: enter valid scores`); return; }
+      if (a === b) { _toast(`Set ${i + 1}: scores cannot be equal`); return; }
+      sets.push({ a, b });
+      if (a > b) wA++; else wB++;
+    }
+    if (sets.length === 0) { _toast('Enter at least one set score'); return; }
+    if (Math.max(wA, wB) < setsToWin) { _toast(`Need ${setsToWin} sets to win`); return; }
+    if (wA === wB) { _toast('Match cannot be a tie'); return; }
+    scoreA = wA; scoreB = wB;
+    winner = wA > wB ? 'A' : 'B';
+    update = { scoreA, scoreB, sets, winner };
+  }
 
-  const winner = sA > sB ? 'A' : 'B';
   document.getElementById('score-overlay')?.remove();
 
   try {
-    await _mRef(_tid, matchId).update({ scoreA: sA, scoreB: sB, winner });
+    await _mRef(_tid, matchId).update(update);
 
     // Propagate winner in knockout bracket
     if (m.winnerTo) {
@@ -680,7 +747,12 @@ function _computeStandings(teams, matches) {
     const w = m.winner === 'A' ? m.teamAId : m.teamBId;
     const l = m.winner === 'A' ? m.teamBId : m.teamAId;
     s[w].W++; s[l].L++;
-    if (m.scoreA != null && m.scoreB != null) {
+    if (m.sets && m.sets.length > 0) {
+      for (const set of m.sets) {
+        s[m.teamAId].sW += set.a; s[m.teamAId].sL += set.b;
+        s[m.teamBId].sW += set.b; s[m.teamBId].sL += set.a;
+      }
+    } else if (m.scoreA != null && m.scoreB != null) {
       s[m.teamAId].sW += m.scoreA; s[m.teamAId].sL += m.scoreB;
       s[m.teamBId].sW += m.scoreB; s[m.teamBId].sL += m.scoreA;
     }
